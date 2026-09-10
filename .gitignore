@@ -1,0 +1,14 @@
+/target
+**/target
+**/pkg
+**/*.css.map
+debug/
+**/*.rs.bk
+*.pdb
+.DS_Store
+.idea/
+.vscode/
+.leptos_reload
+end2end/node_modules
+end2end/playwright-report
+end2end/test-results

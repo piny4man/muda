@@ -1,0 +1,14 @@
+.git
+.grok
+.idea
+.vscode
+target
+**/*.md
+**/*.css.map
+crates/muda-core/tests
+LICENSE
+LICENSE-APACHE
+LICENSE-MIT
+.DS_Store
+.leptos_reload
+end2end
