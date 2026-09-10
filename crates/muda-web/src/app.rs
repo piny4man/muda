@@ -225,109 +225,159 @@ fn HomePage() -> impl IntoView {
 
     view! {
         <div class="page">
-            <header class="hero">
-                <p class="brand">"muda"</p>
-                <h1>"Metadata eraser"</h1>
-                <p class="claim">
-                    "JPEG and PNG are processed in your browser. Files are not uploaded."
-                </p>
-            </header>
-
-            <section
-                class=move || {
-                    if dragging.get() { "dropzone dragging" } else { "dropzone" }
-                }
-                aria-label="File dropzone. JPEG and PNG only."
-            >
-                <input
-                    node_ref=input_ref
-                    id="file-input"
-                    class="sr-only"
-                    type="file"
-                    multiple
-                    accept="image/jpeg,image/png,.jpg,.jpeg,.png"
-                    on:change=on_input_change
-                />
-                <label
-                    class="dropzone-label"
-                    for="file-input"
-                    on:dragover=move |ev| {
-                        ev.prevent_default();
-                        dragging.set(true);
-                    }
-                    on:dragleave=move |ev| {
-                        ev.prevent_default();
-                        dragging.set(false);
-                    }
-                    on:drop=on_drop
-                >
-                    <strong>"Drop JPEG or PNG files here, or click to browse"</strong>
-                    <span class="muted">
-                        {format!(
-                            "Multiple files · JPEG and PNG · max {} MB each",
-                            MAX_FILE_BYTES / (1024 * 1024)
-                        )}
-                    </span>
-                </label>
-            </section>
-
+            <Hero/>
+            <DropZone
+                dragging=dragging
+                input_ref=input_ref
+                on_change=on_input_change
+                on_drop=on_drop
+            />
             <Show when=move || banner.get().is_some()>
                 <p class="banner" role="status">{move || banner.get().unwrap_or_default()}</p>
             </Show>
-
-            <div class="toolbar">
-                <button type="button" class="primary" on:click=strip_all>
-                    "Strip all"
-                </button>
-                <button type="button" on:click=download_all>
-                    "Download all (ZIP)"
-                </button>
-                <button type="button" class="ghost" on:click=clear>
-                    "Clear"
-                </button>
-            </div>
-
-            <fieldset class="selective" disabled>
-                <legend>"Keep selected tags (coming soon)"</legend>
-                <label><input type="checkbox" disabled/> " GPS"</label>
-                <label><input type="checkbox" disabled/> " Camera"</label>
-                <label><input type="checkbox" disabled/> " Software"</label>
-                <label><input type="checkbox" disabled/> " Comments"</label>
-            </fieldset>
-
-            <Show
-                when=move || !items.get().is_empty()
-                fallback=|| view! {
-                    <p class="empty">
-                        "No files yet. Add JPEG or PNG images to strip metadata in your browser."
-                    </p>
-                }
-            >
-                <ul class="files" role="list">
-                    <For
-                        each=move || items.get()
-                        key=|item| item.id
-                        children=move |item| {
-                            view! { <FileRow item=item items=items /> }
-                        }
-                    />
-                </ul>
-            </Show>
-
-            <footer class="foot">
-                <p>
-                    <strong>"Formats: "</strong>
-                    "JPEG and PNG in v1. HEIC, RAW, WebP, TIFF, PDF, video, and audio are not supported."
-                </p>
-                <p>
-                    <strong>"Color profile kept. "</strong>
-                    "ICC / sRGB (and JPEG Adobe APP14) stay in the file so colors do not shift. GPS, camera, software, comments, XMP, and thumbnails are removed."
-                </p>
-                <p class="muted">
-                    "Lossless container rewrite via img-parts. Image scans are not re-encoded."
-                </p>
-            </footer>
+            <Toolbar strip_all=strip_all download_all=download_all clear=clear />
+            <SelectiveStub/>
+            <FileQueue items=items />
+            <PrivacyFooter/>
         </div>
+    }
+}
+
+#[component]
+fn DropZone(
+    dragging: RwSignal<bool>,
+    input_ref: NodeRef<leptos::html::Input>,
+    on_change: impl Fn(web_sys::Event) + 'static + Clone,
+    on_drop: impl Fn(web_sys::DragEvent) + 'static + Clone,
+) -> impl IntoView {
+    view! {
+        <section
+            class=move || {
+                if dragging.get() { "dropzone dragging" } else { "dropzone" }
+            }
+            aria-label="File dropzone. JPEG and PNG only."
+        >
+            <input
+                node_ref=input_ref
+                id="file-input"
+                class="sr-only"
+                type="file"
+                multiple
+                accept="image/jpeg,image/png,.jpg,.jpeg,.png"
+                on:change=on_change
+            />
+            <label
+                class="dropzone-label"
+                for="file-input"
+                on:dragover=move |ev| {
+                    ev.prevent_default();
+                    dragging.set(true);
+                }
+                on:dragleave=move |ev| {
+                    ev.prevent_default();
+                    dragging.set(false);
+                }
+                on:drop=on_drop
+            >
+                <strong>"Drop JPEG or PNG files here, or click to browse"</strong>
+                <span class="muted">
+                    {format!(
+                        "Multiple files · JPEG and PNG · max {} MB each",
+                        MAX_FILE_BYTES / (1024 * 1024)
+                    )}
+                </span>
+            </label>
+        </section>
+    }
+}
+
+#[component]
+fn Toolbar(
+    strip_all: impl Fn(web_sys::MouseEvent) + 'static + Clone,
+    download_all: impl Fn(web_sys::MouseEvent) + 'static + Clone,
+    clear: impl Fn(web_sys::MouseEvent) + 'static + Clone,
+) -> impl IntoView {
+    view! {
+        <div class="toolbar">
+            <button type="button" class="primary" on:click=strip_all>
+                "Strip all"
+            </button>
+            <button type="button" on:click=download_all>
+                "Download all (ZIP)"
+            </button>
+            <button type="button" class="ghost" on:click=clear>
+                "Clear"
+            </button>
+        </div>
+    }
+}
+
+#[component]
+fn FileQueue(items: RwSignal<Vec<FileItem>>) -> impl IntoView {
+    view! {
+        <Show
+            when=move || !items.get().is_empty()
+            fallback=|| view! {
+                <p class="empty">
+                    "No files yet. Add JPEG or PNG images to strip metadata in your browser."
+                </p>
+            }
+        >
+            <ul class="files" role="list">
+                <For
+                    each=move || items.get()
+                    key=|item| item.id
+                    children=move |item| {
+                        view! { <FileRow item=item items=items /> }
+                    }
+                />
+            </ul>
+        </Show>
+    }
+}
+
+#[component]
+fn Hero() -> impl IntoView {
+    view! {
+        <header class="hero">
+            <p class="brand">"muda"</p>
+            <h1>"Metadata eraser"</h1>
+            <p class="claim">
+                "JPEG and PNG are processed in your browser. Files are not uploaded."
+            </p>
+        </header>
+    }
+}
+
+#[component]
+fn SelectiveStub() -> impl IntoView {
+    view! {
+        <fieldset class="selective" disabled>
+            <legend>"Keep selected tags (coming soon)"</legend>
+            <label><input type="checkbox" disabled/> " GPS"</label>
+            <label><input type="checkbox" disabled/> " Camera"</label>
+            <label><input type="checkbox" disabled/> " Software"</label>
+            <label><input type="checkbox" disabled/> " Comments"</label>
+        </fieldset>
+    }
+}
+
+#[component]
+fn PrivacyFooter() -> impl IntoView {
+    view! {
+        <footer class="foot">
+            <p>
+                <strong>"Formats: "</strong>
+                "JPEG and PNG in v1. HEIC, RAW, WebP, TIFF, PDF, video, and audio are not supported."
+            </p>
+            <p>
+                <strong>"Color profile kept. "</strong>
+                "ICC / sRGB (and JPEG Adobe APP14) stay in the file so colors do not shift. GPS, camera, software, comments, XMP, and thumbnails are removed."
+            </p>
+            <p class="muted">
+                "Lossless container rewrite via img-parts. Image scans are not re-encoded."
+            </p>
+        </footer>
     }
 }
 
