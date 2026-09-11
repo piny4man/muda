@@ -19,15 +19,11 @@ pub(crate) fn DropZone(
             <input
                 node_ref=input_ref
                 id="file-input"
-                class="sr-only"
+                class="dropzone-input"
                 type="file"
                 multiple
                 accept="image/jpeg,image/png,.jpg,.jpeg,.png"
                 on:change=on_change
-            />
-            <label
-                class="dropzone-label"
-                for="file-input"
                 on:dragover=move |ev| {
                     ev.prevent_default();
                     dragging.set(true);
@@ -37,7 +33,8 @@ pub(crate) fn DropZone(
                     dragging.set(false);
                 }
                 on:drop=on_drop
-            >
+            />
+            <label class="dropzone-label" for="file-input">
                 <strong>"Drop JPEG or PNG files here, or click to browse"</strong>
                 <span class="muted">
                     {format!(
