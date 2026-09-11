@@ -39,6 +39,15 @@ async fn main() {
             header::REFERRER_POLICY,
             HeaderValue::from_static("no-referrer"),
         );
+        // HydrationScripts and font preload use CORS (`crossorigin`). Safari
+        // (including iOS) refuses the WASM/JS/font fetch without ACAO, so the
+        // page SSR-renders but never hydrates and cannot strip files.
+        if path.starts_with("/pkg/") || path.starts_with("/fonts/") {
+            headers.insert(
+                header::ACCESS_CONTROL_ALLOW_ORIGIN,
+                HeaderValue::from_static("*"),
+            );
+        }
         if path.ends_with(".wasm") {
             headers.insert(
                 header::CACHE_CONTROL,
