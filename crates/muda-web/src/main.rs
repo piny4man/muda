@@ -39,10 +39,16 @@ async fn main() {
             header::REFERRER_POLICY,
             HeaderValue::from_static("no-referrer"),
         );
-        if path.ends_with(".wasm") || path.ends_with(".js") || path.ends_with(".css") {
+        if path.ends_with(".wasm") {
             headers.insert(
                 header::CACHE_CONTROL,
                 HeaderValue::from_static("public, max-age=3600"),
+            );
+        } else if path.ends_with(".js") || path.ends_with(".css") {
+            // Unhashed /pkg/*.css and /pkg/*.js; do not pin a stale sheet for an hour.
+            headers.insert(
+                header::CACHE_CONTROL,
+                HeaderValue::from_static("no-cache"),
             );
         }
         response
