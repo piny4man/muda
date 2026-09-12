@@ -75,3 +75,13 @@ bin-default-features = false
 lib-features = ["hydrate"]
 lib-default-features = false
 lib-profile-release = "wasm-release"
+# Debian's wasm-opt rewrites __wbindgen_externrefs onto the non-growable
+# funcref table. Release then dies in the browser with
+# "WebAssembly.Table.grow(): failed to grow table by 4" and never hydrates.
+# cargo-leptos downloads a current binaryen; reference-types must be on.
+wasm-opt-features = [
+    "-Oz",
+    "--enable-bulk-memory",
+    "--enable-nontrapping-float-to-int",
+    "--enable-reference-types",
+]

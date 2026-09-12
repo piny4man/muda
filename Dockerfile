@@ -6,8 +6,11 @@ FROM rust:1-bookworm AS builder
 ENV CARGO_TERM_COLOR=always \
     CARGO_REGISTRIES_CRATES_IO_PROTOCOL=sparse
 
+# Do not apt-install binaryen: Bookworm's wasm-opt rewrites
+# __wbindgen_externrefs onto the funcref table so the WASM client
+# never hydrates. cargo-leptos downloads a current wasm-opt instead.
 RUN apt-get update \
-    && apt-get install -y --no-install-recommends binaryen pkg-config ca-certificates \
+    && apt-get install -y --no-install-recommends pkg-config ca-certificates \
     && rm -rf /var/lib/apt/lists/*
 
 # Prebuilt cargo-leptos (compiling it from crates.io is much slower).
