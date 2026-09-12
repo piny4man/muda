@@ -3,7 +3,7 @@ name = "muda-core"
 version.workspace = true
 edition.workspace = true
 license.workspace = true
-description = "Lossless JPEG/PNG container rewrite that strips identity metadata"
+description = "Lossless JPEG/PNG/WebP container rewrite that strips identity metadata"
 rust-version = "1.85"
 
 [dependencies]

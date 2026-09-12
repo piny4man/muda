@@ -13,10 +13,10 @@ mod io;
 mod model;
 mod queue;
 mod server;
+mod size;
 mod strip;
 mod toolbar;
 
-pub use model::MAX_FILE_BYTES;
 pub use server::{health, upload_unsupported};
 
 use home::HomePage;

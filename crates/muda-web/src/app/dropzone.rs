@@ -1,7 +1,5 @@
 use leptos::prelude::*;
 
-use super::model::MAX_FILE_BYTES;
-
 #[component]
 pub(crate) fn DropZone(
     dragging: RwSignal<bool>,
@@ -14,7 +12,7 @@ pub(crate) fn DropZone(
             class=move || {
                 if dragging.get() { "dropzone dragging" } else { "dropzone" }
             }
-            aria-label="File dropzone. JPEG and PNG only."
+            aria-label="File dropzone. JPEG, PNG, and WebP."
         >
             <input
                 node_ref=input_ref
@@ -22,7 +20,7 @@ pub(crate) fn DropZone(
                 class="dropzone-input"
                 type="file"
                 multiple
-                accept="image/jpeg,image/png,.jpg,.jpeg,.png"
+                accept="image/jpeg,image/png,image/webp,.jpg,.jpeg,.png,.webp"
                 on:change=on_change
                 on:dragover=move |ev| {
                     ev.prevent_default();
@@ -35,13 +33,8 @@ pub(crate) fn DropZone(
                 on:drop=on_drop
             />
             <label class="dropzone-label" for="file-input">
-                <strong>"Drop JPEG or PNG files here, or click to browse"</strong>
-                <span class="muted">
-                    {format!(
-                        "Multiple files · JPEG and PNG · max {} MB each",
-                        MAX_FILE_BYTES / (1024 * 1024)
-                    )}
-                </span>
+                <strong>"Drop JPEG, PNG, or WebP files here, or click to browse"</strong>
+                <span class="muted">"Multiple files · JPEG, PNG, and WebP"</span>
             </label>
         </section>
     }

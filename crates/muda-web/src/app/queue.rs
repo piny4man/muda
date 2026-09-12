@@ -2,7 +2,8 @@ use leptos::prelude::*;
 use muda_core::{ImageKind, StripReport};
 
 use super::io::{download_bytes, format_bytes};
-use super::model::{FileItem, Status, MAX_FILE_BYTES};
+use super::model::{FileItem, Status};
+use super::size::file_warning;
 use super::strip::run_strip_queue;
 
 #[component]
@@ -12,7 +13,7 @@ pub(crate) fn FileQueue(items: RwSignal<Vec<FileItem>>) -> impl IntoView {
             when=move || !items.get().is_empty()
             fallback=|| view! {
                 <p class="empty">
-                    "No files yet. Add JPEG or PNG images to strip metadata in your browser."
+                    "No files yet. Add JPEG, PNG, or WebP images to strip metadata in your browser."
                 </p>
             }
         >
@@ -40,7 +41,7 @@ fn FileRow(item: FileItem, items: RwSignal<Vec<FileItem>>) -> impl IntoView {
 
     let item_strip = item.clone();
     let strip_one = move |_| {
-        if item_strip.kind.is_none() || item_strip.size > MAX_FILE_BYTES {
+        if item_strip.kind.is_none() {
             return;
         }
         run_strip_queue(vec![item_strip.clone()]);
@@ -58,7 +59,8 @@ fn FileRow(item: FileItem, items: RwSignal<Vec<FileItem>>) -> impl IntoView {
             .unwrap_or_else(|| format!("{}.cleaned", item_dl.name));
         let mime = match item_dl.kind {
             Some(ImageKind::Png) => "image/png",
-            _ => "image/jpeg",
+            Some(ImageKind::WebP) => "image/webp",
+            Some(ImageKind::Jpeg) | None => "image/jpeg",
         };
         let _ = download_bytes(&name, mime, &bytes);
     };
@@ -79,8 +81,10 @@ fn FileRow(item: FileItem, items: RwSignal<Vec<FileItem>>) -> impl IntoView {
     let kind_label = match item.kind {
         Some(ImageKind::Jpeg) => "JPEG",
         Some(ImageKind::Png) => "PNG",
+        Some(ImageKind::WebP) => "WebP",
         None => "unsupported",
     };
+    let large_warning = item.kind.and_then(|_| file_warning(item.size));
     let display_name = item.name.clone();
     let thumb_src = item.preview_url.clone();
     let show_thumb = !preview_url.is_empty() && item.kind.is_some();
@@ -99,9 +103,15 @@ fn FileRow(item: FileItem, items: RwSignal<Vec<FileItem>>) -> impl IntoView {
                 <div class="file-head">
                     <span class="file-name">{display_name}</span>
                     <span class="stamp">{kind_label}</span>
+                    {large_warning.map(|_| {
+                        view! { <span class="stamp warn">"large"</span> }
+                    })}
                     <span class="muted">{format_bytes(item.size)}</span>
                     <StatusPill status=item.status />
                 </div>
+                <p class="notice" role="status">
+                    {large_warning.unwrap_or_default()}
+                </p>
                 <p class="error" role="alert">
                     {move || item.error.get().unwrap_or_default()}
                 </p>
@@ -113,7 +123,6 @@ fn FileRow(item: FileItem, items: RwSignal<Vec<FileItem>>) -> impl IntoView {
                         disabled=move || {
                             item.kind.is_none()
                                 || matches!(item.status.get(), Status::Stripping | Status::Done)
-                                || item.size > MAX_FILE_BYTES
                         }
                     >
                         "Strip"

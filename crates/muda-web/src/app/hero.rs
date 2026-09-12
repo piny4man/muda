@@ -26,7 +26,7 @@ pub(crate) fn Hero() -> impl IntoView {
             </p>
             <h1>"Metadata eraser"</h1>
             <p class="claim">
-                "JPEG and PNG are processed in your browser. Files are not uploaded."
+                "JPEG, PNG, and WebP are processed in your browser. Files are not uploaded."
             </p>
         </header>
     }

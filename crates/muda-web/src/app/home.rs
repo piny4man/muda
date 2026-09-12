@@ -9,8 +9,9 @@ use super::chrome::{PrivacyFooter, SelectiveStub};
 use super::dropzone::DropZone;
 use super::hero::Hero;
 use super::io::{collect_file_list, download_bytes, read_file_bytes};
-use super::model::{FileItem, Status, MAX_FILE_BYTES};
+use super::model::{FileItem, Status};
 use super::queue::FileQueue;
+use super::size::queue_warning;
 use super::strip::run_strip_queue;
 use super::toolbar::Toolbar;
 
@@ -48,15 +49,10 @@ pub(crate) fn HomePage() -> impl IntoView {
                 let (status, error) = if kind.is_none() {
                     (
                         Status::Unsupported,
-                        Some("Not a JPEG or PNG. This format is not supported in v1.".to_string()),
-                    )
-                } else if size > MAX_FILE_BYTES {
-                    (
-                        Status::Error,
-                        Some(format!(
-                            "File is larger than {} MB.",
-                            MAX_FILE_BYTES / (1024 * 1024)
-                        )),
+                        Some(
+                            "Not a JPEG, PNG, or WebP. This format is not supported in v1."
+                                .to_string(),
+                        ),
                     )
                 } else {
                     (Status::Queued, None)
@@ -100,9 +96,7 @@ pub(crate) fn HomePage() -> impl IntoView {
             .get()
             .into_iter()
             .filter(|item| {
-                item.kind.is_some()
-                    && matches!(item.status.get(), Status::Queued | Status::Error)
-                    && item.size <= MAX_FILE_BYTES
+                item.kind.is_some() && matches!(item.status.get(), Status::Queued | Status::Error)
             })
             .collect();
         run_strip_queue(ready);
@@ -159,6 +153,16 @@ pub(crate) fn HomePage() -> impl IntoView {
             />
             <Show when=move || banner.get().is_some()>
                 <p class="banner" role="status">{move || banner.get().unwrap_or_default()}</p>
+            </Show>
+            <Show when=move || {
+                let total: usize = items.get().iter().map(|item| item.size).sum();
+                queue_warning(total).is_some()
+            }>
+                <p class="banner warn" role="status">
+                    {queue_warning(
+                        items.get().iter().map(|item| item.size).sum::<usize>(),
+                    ).unwrap_or_default()}
+                </p>
             </Show>
             <Toolbar strip_all=strip_all download_all=download_all clear=clear />
             <SelectiveStub/>

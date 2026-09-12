@@ -352,6 +352,9 @@ button:active:not(:disabled) {
 .error:empty { display: none; }
 .error { color: var(--bad); margin: 0.25rem 0 0; }
 
+.notice:empty { display: none; }
+.notice { color: var(--warn); margin: 0.25rem 0 0; }
+
 .report { margin: 0.4rem 0 0; }
 
 .tags {
@@ -374,6 +377,11 @@ button:active:not(:disabled) {
   color: var(--bad);
   padding: 0.65rem 0.8rem;
   margin: 0.5rem 0;
+}
+
+.banner.warn {
+  border-color: var(--line);
+  color: var(--warn);
 }
 
 .foot {
