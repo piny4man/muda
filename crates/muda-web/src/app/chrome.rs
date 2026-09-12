@@ -31,3 +31,18 @@ pub(crate) fn PrivacyFooter() -> impl IntoView {
         </footer>
     }
 }
+
+#[component]
+pub(crate) fn SiteFooter() -> impl IntoView {
+    view! {
+        <footer class="site-footer">
+            <a href="https://github.com/piny4man/muda" target="_blank" rel="noopener noreferrer">
+                "muda on GitHub"
+            </a>
+            <span class="sep" aria-hidden="true">"·"</span>
+            <a href="https://pinya.dev" target="_blank" rel="noopener noreferrer">
+                "by Pinya.dev"
+            </a>
+        </footer>
+    }
+}

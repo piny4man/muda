@@ -73,11 +73,11 @@ body {
 .page {
   width: min(40rem, 100%);
   margin: 0 auto;
-  padding: max(1rem, env(safe-area-inset-top)) var(--pad-x-end) 2.5rem var(--pad-x);
+  padding: max(1rem, env(safe-area-inset-top)) var(--pad-x-end) calc(4rem + env(safe-area-inset-bottom)) var(--pad-x);
 }
 
 .page.has-queue {
-  padding-bottom: 6rem;
+  padding-bottom: calc(7rem + env(safe-area-inset-bottom));
 }
 
 .hero { margin-bottom: 1.5rem; }
@@ -389,6 +389,42 @@ button:active:not(:disabled) {
   padding-top: 1.25rem;
   border-top: 2px solid var(--line);
   font-size: 0.875rem;
+}
+
+.site-footer {
+  position: fixed;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  z-index: 10;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: center;
+  column-gap: 0.6rem;
+  row-gap: 0.15rem;
+  padding: 0.55rem var(--pad-x) calc(0.55rem + env(safe-area-inset-bottom));
+  background: var(--bg);
+  font-size: 0.8125rem;
+  letter-spacing: 0.03em;
+}
+
+.site-footer .sep {
+  color: var(--muted);
+}
+
+.site-footer a {
+  color: var(--accent);
+  font-weight: 700;
+  text-decoration: none;
+}
+
+@media (hover: hover) {
+  .site-footer a:hover {
+    text-decoration: underline;
+    text-decoration-thickness: 2px;
+    text-underline-offset: 0.15em;
+  }
 }
 
 .sr-only {
