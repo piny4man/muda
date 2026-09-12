@@ -20,6 +20,7 @@ mod toolbar;
 pub use server::{health, upload_unsupported};
 
 use home::HomePage;
+use chrome::SiteFooter;
 
 pub fn shell(options: LeptosOptions) -> impl IntoView {
     view! {
@@ -63,5 +64,6 @@ pub fn App() -> impl IntoView {
                 </Routes>
             </main>
         </Router>
+        <SiteFooter/>
     }
 }
