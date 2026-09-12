@@ -1,6 +1,9 @@
 use image::GenericImageView;
 use img_parts::jpeg::{markers, Jpeg};
 use img_parts::png::Png;
+use img_parts::webp::{
+    WebP, CHUNK_ANIM, CHUNK_ANMF, CHUNK_EXIF, CHUNK_ICCP, CHUNK_VP8L, CHUNK_XMP,
+};
 use img_parts::Bytes;
 use muda_core::{sniff_kind, strip_image, ImageKind, StripError, TagFamily};
 
@@ -133,9 +136,21 @@ fn sniff_truncated_and_garbage() {
     assert_eq!(sniff_kind(&[0xFF, 0xD7]), None);
     assert_eq!(sniff_kind(b"PK\x03\x04"), None);
     assert_eq!(sniff_kind(&[0x89, 0x50, 0x4E]), None);
+    assert_eq!(sniff_kind(b"RIFF\x24\x00\x00\x00WAVE"), None);
+    assert_eq!(
+        sniff_kind(b"\0\0\0\x18ftypheic"),
+        None,
+        "HEIC must stay unsupported"
+    );
     match strip_image("x.bin", &[0, 1, 2, 3]) {
         Err(StripError::Unsupported) => {}
         other => panic!("expected Unsupported, got {other:?}"),
+    }
+    let truncated = b"RIFF\x00\x00\x00\x00WEBP";
+    assert_eq!(sniff_kind(truncated), Some(ImageKind::WebP));
+    match strip_image("broken.webp", truncated) {
+        Err(StripError::InvalidImage(_)) => {}
+        other => panic!("truncated WebP must be invalid, got {other:?}"),
     }
 }
 
@@ -145,4 +160,112 @@ fn input_buffer_is_not_returned_mutated() {
     let before = input.clone();
     let _ = strip_image("a.jpg", &input).unwrap();
     assert_eq!(input, before);
+}
+
+fn parse_webp(bytes: &[u8]) -> WebP {
+    WebP::from_bytes(Bytes::copy_from_slice(bytes)).expect("parse webp")
+}
+
+fn chunk_bytes(webp: &WebP, id: [u8; 4]) -> Option<Bytes> {
+    webp.chunk_by_id(id)?.content().data().cloned()
+}
+
+#[test]
+fn webp_exif_xmp_is_stripped() {
+    let input = fixture("webp_exif.webp");
+    assert_eq!(sniff_kind(&input), Some(ImageKind::WebP));
+    assert!(contains_ascii(&input, b"EXIF"));
+    assert!(contains_ascii(&input, b"GPS"));
+    assert!(contains_ascii(&input, b"SECRET_TAG_XYZ"));
+
+    let original = parse_webp(&input);
+    let vp8l = chunk_bytes(&original, CHUNK_VP8L).expect("fixture VP8L");
+    let (output, report) = strip_image("chat.webp", &input).expect("strip webp");
+
+    assert_eq!(report.kind, ImageKind::WebP);
+    assert_eq!(report.output_name, "chat.cleaned.webp");
+    assert_eq!(report.input_bytes, input.len());
+    assert_eq!(report.output_bytes, output.len());
+    assert!(
+        report.removed.iter().any(|t| t.family == TagFamily::Gps),
+        "report must include Gps, got {:?}",
+        report.removed
+    );
+    assert!(
+        report.removed.iter().any(|t| t.family == TagFamily::Xmp),
+        "report must include XMP, got {:?}",
+        report.removed
+    );
+    assert!(
+        report.removed.iter().all(|t| t.family != TagFamily::Icc),
+        "kept ICC must not be listed as removed: {:?}",
+        report.removed
+    );
+
+    let cleaned = parse_webp(&output);
+    assert!(cleaned.chunk_by_id(CHUNK_EXIF).is_none());
+    assert!(cleaned.chunk_by_id(CHUNK_XMP).is_none());
+    assert_eq!(chunk_bytes(&cleaned, CHUNK_VP8L).as_ref(), Some(&vp8l));
+    assert!(!contains_ascii(&output, b"SECRET_TAG_XYZ"));
+    assert!(!contains_ascii(&output, b"GPS"));
+}
+
+#[test]
+fn webp_without_metadata_still_valid() {
+    let input = fixture("webp_plain.webp");
+    assert_eq!(sniff_kind(&input), Some(ImageKind::WebP));
+    assert!(!contains_ascii(&input, b"EXIF"));
+    let original = parse_webp(&input);
+    let vp8l = chunk_bytes(&original, CHUNK_VP8L).expect("plain VP8L");
+    let (output, report) = strip_image("plain.webp", &input).expect("strip plain webp");
+    assert_eq!(report.kind, ImageKind::WebP);
+    assert_eq!(report.output_name, "plain.cleaned.webp");
+    let cleaned = parse_webp(&output);
+    assert_eq!(chunk_bytes(&cleaned, CHUNK_VP8L).as_ref(), Some(&vp8l));
+}
+
+#[test]
+fn webp_icc_is_kept() {
+    let input = fixture("webp_icc.webp");
+    assert!(contains_ascii(&input, b"ICC_PROFILE_MUDA_KEEP"));
+    let original = parse_webp(&input);
+    let icc = chunk_bytes(&original, CHUNK_ICCP).expect("fixture ICCP");
+    let (output, report) = strip_image("profile.webp", &input).expect("strip icc webp");
+    assert!(
+        report.removed.iter().all(|t| t.family != TagFamily::Icc),
+        "ICC must stay: {:?}",
+        report.removed
+    );
+    let cleaned = parse_webp(&output);
+    assert_eq!(chunk_bytes(&cleaned, CHUNK_ICCP).as_ref(), Some(&icc));
+    assert!(contains_ascii(&output, b"ICC_PROFILE_MUDA_KEEP"));
+}
+
+#[test]
+fn webp_animation_payload_is_kept() {
+    let input = fixture("webp_anim.webp");
+    assert!(contains_ascii(&input, b"ANIM"));
+    assert!(contains_ascii(&input, b"EXIF"));
+    let original = parse_webp(&input);
+    let anim = chunk_bytes(&original, CHUNK_ANIM).expect("ANIM");
+    let frames: Vec<Bytes> = original
+        .chunks_by_id(CHUNK_ANMF)
+        .filter_map(|chunk| chunk.content().data().cloned())
+        .collect();
+    assert_eq!(frames.len(), 2);
+    let (output, report) = strip_image("loop.webp", &input).expect("strip anim webp");
+    assert!(
+        report.removed.iter().any(|t| t.family == TagFamily::Gps)
+            || report.removed.iter().any(|t| t.label.contains("EXIF")),
+        "anim EXIF must be reported: {:?}",
+        report.removed
+    );
+    let cleaned = parse_webp(&output);
+    assert!(cleaned.chunk_by_id(CHUNK_EXIF).is_none());
+    assert_eq!(chunk_bytes(&cleaned, CHUNK_ANIM).as_ref(), Some(&anim));
+    let cleaned_frames: Vec<Bytes> = cleaned
+        .chunks_by_id(CHUNK_ANMF)
+        .filter_map(|chunk| chunk.content().data().cloned())
+        .collect();
+    assert_eq!(cleaned_frames, frames);
 }

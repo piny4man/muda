@@ -1,6 +1,6 @@
 ---
 name: muda
-description: Browser-first JPEG/PNG metadata eraser. Brutalist stamp, acid lime accent.
+description: Browser-first JPEG/PNG/WebP metadata eraser. Brutalist stamp, acid lime accent.
 colors:
   paper: "oklch(0.96 0.012 125)"
   night: "oklch(0.18 0.02 125)"

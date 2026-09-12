@@ -1,16 +1,18 @@
-//! Lossless JPEG/PNG container rewrite that strips identity metadata.
+//! Lossless JPEG/PNG/WebP container rewrite that strips identity metadata.
 //!
-//! Color profiles (`iCCP` / `sRGB` / JPEG ICC APP2 / Adobe APP14) are kept.
+//! Color profiles (`iCCP` / `sRGB` / JPEG ICC APP2 / Adobe APP14 / WebP ICCP) are kept.
 //! Compressed image scans are not re-encoded.
 
 mod jpeg;
 mod png;
+mod webp;
 
 use std::fmt;
 use std::io::Cursor;
 
 pub use jpeg::strip_jpeg;
 pub use png::strip_png;
+pub use webp::strip_webp;
 
 const JPEG_SOI: &[u8] = &[0xFF, 0xD8];
 const PNG_SIGNATURE: &[u8] = &[0x89, 0x50, 0x4E, 0x47, 0x0D, 0x0A, 0x1A, 0x0A];
@@ -19,6 +21,7 @@ const PNG_SIGNATURE: &[u8] = &[0x89, 0x50, 0x4E, 0x47, 0x0D, 0x0A, 0x1A, 0x0A];
 pub enum ImageKind {
     Jpeg,
     Png,
+    WebP,
 }
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -81,7 +84,9 @@ pub enum StripError {
 impl fmt::Display for StripError {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
-            StripError::Unsupported => f.write_str("unsupported format (only JPEG and PNG in v1)"),
+            StripError::Unsupported => {
+                f.write_str("unsupported format (only JPEG, PNG, and WebP in v1)")
+            }
             StripError::InvalidImage(msg) => write!(f, "invalid image: {msg}"),
             StripError::Encode(msg) => write!(f, "encode failed: {msg}"),
         }
@@ -90,15 +95,21 @@ impl fmt::Display for StripError {
 
 impl std::error::Error for StripError {}
 
-/// Detect JPEG (`FF D8`) or PNG signature. Truncated or unknown bytes return `None`.
+/// Detect JPEG (`FF D8`), PNG, or WebP (`RIFF….WEBP`). Other RIFF is unsupported.
 pub fn sniff_kind(bytes: &[u8]) -> Option<ImageKind> {
     if bytes.starts_with(JPEG_SOI) {
         Some(ImageKind::Jpeg)
     } else if bytes.starts_with(PNG_SIGNATURE) {
         Some(ImageKind::Png)
+    } else if is_webp(bytes) {
+        Some(ImageKind::WebP)
     } else {
         None
     }
+}
+
+fn is_webp(bytes: &[u8]) -> bool {
+    bytes.len() >= 12 && bytes.starts_with(b"RIFF") && &bytes[8..12] == b"WEBP"
 }
 
 /// Strip identity metadata and return **new** bytes plus a report.
@@ -107,6 +118,7 @@ pub fn strip_image(name: &str, data: &[u8]) -> Result<(Vec<u8>, StripReport), St
     match sniff_kind(data) {
         Some(ImageKind::Jpeg) => strip_jpeg(name, data),
         Some(ImageKind::Png) => strip_png(name, data),
+        Some(ImageKind::WebP) => strip_webp(name, data),
         None => Err(StripError::Unsupported),
     }
 }
@@ -134,6 +146,7 @@ pub(crate) fn cleaned_output_name(original: &str, kind: ImageKind) -> String {
     let ext = match kind {
         ImageKind::Jpeg => "jpg",
         ImageKind::Png => "png",
+        ImageKind::WebP => "webp",
     };
     format!("{stem}.cleaned.{ext}")
 }
@@ -210,6 +223,11 @@ mod tests {
     fn sniff_jpeg_png_and_garbage() {
         assert_eq!(sniff_kind(&[0xFF, 0xD8, 0xFF]), Some(ImageKind::Jpeg));
         assert_eq!(sniff_kind(PNG_SIGNATURE), Some(ImageKind::Png));
+        let mut webp = [0u8; 12];
+        webp[..4].copy_from_slice(b"RIFF");
+        webp[8..12].copy_from_slice(b"WEBP");
+        assert_eq!(sniff_kind(&webp), Some(ImageKind::WebP));
+        assert_eq!(sniff_kind(b"RIFF\x00\x00\x00\x00WAVE"), None);
         assert_eq!(sniff_kind(&[]), None);
         assert_eq!(sniff_kind(&[0xFF]), None);
         assert_eq!(sniff_kind(b"not an image"), None);
@@ -237,6 +255,10 @@ mod tests {
         assert_eq!(
             cleaned_output_name("noext", ImageKind::Jpeg),
             "noext.cleaned.jpg"
+        );
+        assert_eq!(
+            cleaned_output_name("chat.webp", ImageKind::WebP),
+            "chat.cleaned.webp"
         );
     }
 }

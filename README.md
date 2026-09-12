@@ -1,8 +1,8 @@
 # muda
 
-Privacy-oriented **metadata eraser** for JPEG and PNG. Full-stack Rust (Leptos + Axum + WASM).
+Privacy-oriented **metadata eraser** for JPEG, PNG, and WebP. Full-stack Rust (Leptos + Axum + WASM).
 
-**JPEG and PNG are processed in your browser. Files are not uploaded.**
+**JPEG, PNG, and WebP are processed in your browser. Files are not uploaded.**
 
 v1 never sends image bytes to the server. `muda-core::strip_image` runs in the hydrated WASM client. The Axum process only serves HTML/WASM/CSS and two stubs (`health`, a 501 for a future unsupported-format upload).
 
@@ -11,7 +11,7 @@ v1 never sends image bytes to the server. `muda-core::strip_image` runs in the h
 ```
 muda/
   crates/
-    muda-core/    # format sniff + lossless JPEG/PNG rewrite
+    muda-core/    # format sniff + lossless JPEG/PNG/WebP rewrite
     muda-web/     # Leptos 0.8 SSR + Axum 0.8 shell
 ```
 
@@ -23,16 +23,18 @@ License: MIT OR Apache-2.0.
 | --- | --- |
 | JPEG | yes, in the browser |
 | PNG | yes, in the browser |
-| HEIC, RAW, WebP, TIFF, PDF, video, audio | no |
+| WebP | yes, in the browser |
+| HEIC, RAW, TIFF, PDF, video, audio | no |
 
-Color profiles (`iCCP` / `sRGB` / JPEG ICC APP2 / Adobe APP14) are **kept** so pixels do not shift. GPS, camera, software, comments, XMP, Photoshop IRB, and embedded thumbnails are removed.
+Color profiles (`iCCP` / `sRGB` / JPEG ICC APP2 / Adobe APP14 / WebP `ICCP`) are **kept** so pixels do not shift. GPS, camera, software, comments, XMP, Photoshop IRB, and embedded thumbnails are removed.
 
-## JPEG / PNG strategy
+## JPEG / PNG / WebP strategy
 
-Lossless **container rewrite** with [`img-parts`](https://crates.io/crates/img-parts) `0.4`. Compressed scans / `IDAT` are copied, not decoded to RGB and re-encoded. [`kamadak-exif`](https://crates.io/crates/kamadak-exif) `0.6` is read-only, for the per-file report.
+Lossless **container rewrite** with [`img-parts`](https://crates.io/crates/img-parts) `0.4`. Compressed scans / `IDAT` / VP8 payloads are copied, not decoded to RGB and re-encoded. [`kamadak-exif`](https://crates.io/crates/kamadak-exif) `0.6` is read-only, for the per-file report.
 
 - JPEG: drop APP1 (Exif / XMP), COM, Photoshop APP13, and other metadata APPn. Keep a JFIF APP0 (or write a minimal one), ICC APP2, and Adobe APP14.
 - PNG: rebuild the file with `IHDR`, `PLTE`, `IDAT`, `IEND`, plus correctness/color chunks (`tRNS`, `gAMA`, `cHRM`, `sRGB`, `iCCP`, `pHYs`, …). Drop `eXIf`, `tEXt`, `zTXt`, `iTXt`, `tIME`, and other ancillary metadata. CRCs are those of the kept chunks.
+- WebP: drop `EXIF` and `XMP ` chunks and clear those VP8X flags. Keep `VP8` / `VP8L` / `VP8X` / `ALPH` / `ANIM` / `ANMF` / `ICCP`.
 
 ## Crate versions
 
@@ -73,13 +75,13 @@ Then open http://127.0.0.1:3000/.
 
 ### Use the page
 
-1. Drop JPEG/PNG files (or click the dropzone). Multiple files are fine. A `.txt` or HEIC stays in the list as **unsupported** — it is not uploaded.
+1. Drop JPEG/PNG/WebP files (or click the dropzone). Multiple files are fine. A `.txt` or HEIC stays in the list as **unsupported** — it is not uploaded.
 2. Previews are local object URLs. Nothing is sent to the server.
 3. **Strip** one row, or **Strip all**. Work runs in the browser (two at a time).
-4. **Download** a cleaned `{stem}.cleaned.jpg` / `.png`, or **Download all (ZIP)**.
+4. **Download** a cleaned `{stem}.cleaned.jpg` / `.png` / `.webp`, or **Download all (ZIP)**.
 5. **Clear** / **Remove** revokes the object URLs.
 
-Max 50 MB per file. Color profile is kept; GPS/camera/comments/XMP go away.
+Color profile is kept; GPS/camera/comments/XMP go away. Large files stay in the queue with a memory warning; there is no hard size cap.
 
 Release binary + `target/site` assets:
 
@@ -90,7 +92,7 @@ cargo leptos build --release
 
 ## Deploy (Railway SSR)
 
-v1 is **SSR Axum + a WASM client**. JPEG/PNG bytes never leave the browser. Railway runs the Axum process from the root `Dockerfile` (auto-detected). Do not put this binary on Vercel Functions or Cloudflare Workers.
+v1 is **SSR Axum + a WASM client**. JPEG/PNG/WebP bytes never leave the browser. Railway runs the Axum process from the root `Dockerfile` (auto-detected). Do not put this binary on Vercel Functions or Cloudflare Workers.
 
 ### Railway
 
@@ -144,7 +146,7 @@ cargo test -p muda-core
 cargo test -p muda-core --target wasm32-unknown-unknown --no-run
 ```
 
-Fixtures live in `crates/muda-core/tests/fixtures/` (tiny JPEG with EXIF GPS + planted `SECRET_TAG_XYZ`, plain JPEG, PNG with `tEXt`/`eXIf`). Regenerate with:
+Fixtures live in `crates/muda-core/tests/fixtures/` (tiny JPEG with EXIF GPS + planted `SECRET_TAG_XYZ`, plain JPEG, PNG with `tEXt`/`eXIf`, WebP with EXIF/XMP, ICC, and animation). Regenerate with:
 
 ```sh
 python3 crates/muda-core/tests/generate_fixtures.py
@@ -157,4 +159,4 @@ python3 crates/muda-core/tests/generate_fixtures.py
 3. Download one file as a blob, or all as a ZIP built in WASM (store method, no extra ZIP crate).
 4. Object URLs are revoked when a row is removed or the list is cleared.
 
-Max file size: 50 MB (`muda_web::app::MAX_FILE_BYTES`).
+There is no hard file-size cap. Files at or above 50 MiB, and queues at or above 256 MiB of originals, show a memory warning; Strip still runs.

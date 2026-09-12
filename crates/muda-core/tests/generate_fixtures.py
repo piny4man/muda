@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Generate tiny JPEG/PNG fixtures with planted metadata strings."""
+"""Generate tiny JPEG/PNG/WebP fixtures with planted metadata strings."""
 
 from __future__ import annotations
 
@@ -124,6 +124,67 @@ def png_chunk(kind: bytes, payload: bytes) -> bytes:
     return struct.pack(">I", len(payload)) + kind + payload + struct.pack(">I", crc)
 
 
+def webp_plain() -> None:
+    im = Image.new("RGB", (16, 16), (10, 20, 30))
+    buf = BytesIO()
+    im.save(buf, format="WEBP", lossless=True)
+    data = buf.getvalue()
+    write("webp_plain.webp", data)
+
+
+def webp_exif_xmp(tiff: bytes) -> None:
+    im = Image.new("RGB", (16, 16), (40, 50, 60))
+    xmp = (
+        b'<?xpacket begin="" id="W5M0MpCehiHzreSzNTczkc9d"?>'
+        b'<x:xmpmeta xmlns:x="adobe:ns:meta/">SECRET_TAG_XYZ</x:xmpmeta>'
+    )
+    buf = BytesIO()
+    im.save(
+        buf,
+        format="WEBP",
+        lossless=True,
+        exif=b"Exif\x00\x00" + tiff,
+        xmp=xmp,
+    )
+    data = buf.getvalue()
+    if b"EXIF" not in data or b"GPS" not in data or b"SECRET_TAG_XYZ" not in data:
+        raise SystemExit("webp_exif missing planted metadata")
+    write("webp_exif.webp", data)
+
+
+def webp_icc() -> None:
+    im = Image.new("RGB", (16, 16), (1, 2, 3))
+    icc = b"ICC_PROFILE_MUDA_KEEP" + bytes(200)
+    buf = BytesIO()
+    im.save(buf, format="WEBP", lossless=True, icc_profile=icc)
+    data = buf.getvalue()
+    if b"ICCP" not in data or b"ICC_PROFILE_MUDA_KEEP" not in data:
+        raise SystemExit("webp_icc missing profile")
+    write("webp_icc.webp", data)
+
+
+def webp_anim(tiff: bytes) -> None:
+    frames = [
+        Image.new("RGB", (16, 16), (255, 0, 0)),
+        Image.new("RGB", (16, 16), (0, 255, 0)),
+    ]
+    buf = BytesIO()
+    frames[0].save(
+        buf,
+        format="WEBP",
+        save_all=True,
+        append_images=frames[1:],
+        duration=80,
+        loop=0,
+        lossless=True,
+        exif=b"Exif\x00\x00" + tiff,
+    )
+    data = buf.getvalue()
+    if b"ANIM" not in data or b"ANMF" not in data or b"EXIF" not in data:
+        raise SystemExit("webp_anim missing animation or exif")
+    write("webp_anim.webp", data)
+
+
 def png_text(tiff: bytes) -> None:
     im = Image.new("RGB", (16, 16), (200, 10, 10))
     meta = PngImagePlugin.PngInfo()
@@ -148,6 +209,10 @@ def main() -> None:
     payload = gps[app1 + 4 : app1 + 2 + length]
     tiff = payload[6:] if payload.startswith(b"Exif\x00\x00") else payload
     png_text(tiff)
+    webp_plain()
+    webp_exif_xmp(tiff)
+    webp_icc()
+    webp_anim(tiff)
 
 
 if __name__ == "__main__":

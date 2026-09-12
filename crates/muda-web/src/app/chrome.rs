@@ -19,7 +19,7 @@ pub(crate) fn PrivacyFooter() -> impl IntoView {
         <footer class="foot">
             <p>
                 <strong>"Formats: "</strong>
-                "JPEG and PNG in v1. HEIC, RAW, WebP, TIFF, PDF, video, and audio are not supported."
+                "JPEG, PNG, and WebP in v1. HEIC, RAW, TIFF, PDF, video, and audio are not supported."
             </p>
             <p>
                 <strong>"Color profile kept. "</strong>
