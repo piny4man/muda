@@ -5,11 +5,11 @@ use muda_core::sniff_kind;
 
 use crate::zip_store::zip_store;
 
-use super::chrome::{PrivacyFooter, SelectiveStub};
+use super::chrome::{KeepTags, PrivacyFooter};
 use super::dropzone::DropZone;
 use super::hero::Hero;
 use super::io::{collect_file_list, download_bytes, read_file_bytes};
-use super::model::{FileItem, Status};
+use super::model::{FileItem, KeepSelection, Status};
 use super::queue::FileQueue;
 use super::size::queue_warning;
 use super::strip::run_strip_queue;
@@ -18,6 +18,7 @@ use super::toolbar::Toolbar;
 #[component]
 pub(crate) fn HomePage() -> impl IntoView {
     let items = RwSignal::new(Vec::<FileItem>::new());
+    let keep = RwSignal::new(KeepSelection::default());
     let next_id = RwSignal::new(1u64);
     let dragging = RwSignal::new(false);
     let input_ref: NodeRef<leptos::html::Input> = NodeRef::new();
@@ -28,10 +29,8 @@ pub(crate) fn HomePage() -> impl IntoView {
             for file in files {
                 let name = file.name();
                 let size = file.size() as usize;
-                let preview_url = match web_sys::Url::create_object_url_with_blob(&file) {
-                    Ok(url) => url,
-                    Err(_) => String::new(),
-                };
+                let preview_url =
+                    web_sys::Url::create_object_url_with_blob(&file).unwrap_or_default();
                 let bytes = match read_file_bytes(file).await {
                     Ok(b) => b,
                     Err(e) => {
@@ -99,7 +98,7 @@ pub(crate) fn HomePage() -> impl IntoView {
                 item.kind.is_some() && matches!(item.status.get(), Status::Queued | Status::Error)
             })
             .collect();
-        run_strip_queue(ready);
+        run_strip_queue(ready, keep.get().families());
     };
 
     let download_all = move |_| {
@@ -165,8 +164,8 @@ pub(crate) fn HomePage() -> impl IntoView {
                 </p>
             </Show>
             <Toolbar strip_all=strip_all download_all=download_all clear=clear />
-            <SelectiveStub/>
-            <FileQueue items=items />
+            <KeepTags keep=keep />
+            <FileQueue items=items keep=keep />
             <PrivacyFooter/>
         </div>
     }

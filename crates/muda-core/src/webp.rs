@@ -5,20 +5,29 @@ use img_parts::webp::{
 };
 use img_parts::Bytes;
 
+use crate::exif_rewrite::{rewrite_exif_tiff, tiff_from_exif_payload};
 use crate::{
-    cleaned_output_name, parse_exif_raw, ImageKind, RemovedTag, StripError, StripReport, TagFamily,
+    cleaned_output_name, drop_unkept, maybe_makernote_warning, parse_exif_raw, xmp_dropped_warning,
+    ImageKind, RemovedTag, StripError, StripReport, TagFamily,
 };
 
 /// VP8X feature flags for EXIF (bit 3) and XMP (bit 2).
 const VP8X_FLAG_EXIF: u8 = 0b0000_1000;
 const VP8X_FLAG_XMP: u8 = 0b0000_0100;
 
-pub fn strip_webp(name: &str, data: &[u8]) -> Result<(Vec<u8>, StripReport), StripError> {
+pub(crate) fn strip_webp(
+    name: &str,
+    data: &[u8],
+    keep: &[TagFamily],
+) -> Result<(Vec<u8>, StripReport), StripError> {
     let webp = WebP::from_bytes(Bytes::copy_from_slice(data))
         .map_err(|e| StripError::InvalidImage(e.to_string()))?;
 
     let mut removed = Vec::new();
+    let mut warnings = Vec::new();
     let mut kept = Vec::new();
+
+    let rewritten_exif = rewrite_webp_exif(webp.chunks(), keep, &mut removed, &mut warnings);
 
     for chunk in webp.chunks() {
         let id = chunk.id();
@@ -31,14 +40,26 @@ pub fn strip_webp(name: &str, data: &[u8]) -> Result<(Vec<u8>, StripReport), Str
         {
             kept.push(chunk.clone());
         } else if id == CHUNK_VP8X {
-            kept.push(vp8x_without_metadata_flags(chunk));
+            kept.push(vp8x_set_metadata_flags(
+                chunk,
+                rewritten_exif.is_some(),
+                false,
+            ));
         } else if id == CHUNK_EXIF {
-            removed.extend(tags_for_exif_chunk(chunk));
+            if let Some(ref payload) = rewritten_exif {
+                kept.push(RiffChunk::new(
+                    CHUNK_EXIF,
+                    RiffContent::Data(Bytes::copy_from_slice(payload)),
+                ));
+            }
         } else if id == CHUNK_XMP {
             removed.push(RemovedTag {
                 family: TagFamily::Xmp,
                 label: "XMP".to_string(),
             });
+            if !keep.is_empty() {
+                warnings.push(xmp_dropped_warning());
+            }
         } else {
             removed.push(RemovedTag {
                 family: TagFamily::Other,
@@ -62,14 +83,50 @@ pub fn strip_webp(name: &str, data: &[u8]) -> Result<(Vec<u8>, StripReport), Str
         kind: ImageKind::WebP,
         output_name: cleaned_output_name(name, ImageKind::WebP),
         removed,
-        warnings: Vec::new(),
+        warnings,
         input_bytes: data.len(),
         output_bytes: output.len(),
     };
     Ok((output, report))
 }
 
-fn vp8x_without_metadata_flags(chunk: &RiffChunk) -> RiffChunk {
+fn rewrite_webp_exif(
+    chunks: &[RiffChunk],
+    keep: &[TagFamily],
+    removed: &mut Vec<RemovedTag>,
+    warnings: &mut Vec<String>,
+) -> Option<Vec<u8>> {
+    let chunk = chunks.iter().find(|chunk| chunk.id() == CHUNK_EXIF)?;
+    let tags = tags_for_exif_chunk(chunk);
+    maybe_makernote_warning(&tags, keep, warnings);
+    let payload = chunk.content().data().map(|d| d.as_ref())?;
+    let tiff = tiff_from_exif_payload(payload);
+    match rewrite_exif_tiff(tiff, keep) {
+        Some(rewritten) => {
+            removed.extend(drop_unkept(tags, keep));
+            if payload.starts_with(b"Exif\0\0") {
+                let mut wrapped = b"Exif\0\0".to_vec();
+                wrapped.extend_from_slice(&rewritten);
+                Some(wrapped)
+            } else {
+                Some(rewritten)
+            }
+        }
+        None => {
+            if tags.is_empty() {
+                removed.push(RemovedTag {
+                    family: TagFamily::Other,
+                    label: "EXIF".to_string(),
+                });
+            } else {
+                removed.extend(drop_unkept(tags, keep));
+            }
+            None
+        }
+    }
+}
+
+fn vp8x_set_metadata_flags(chunk: &RiffChunk, exif: bool, xmp: bool) -> RiffChunk {
     let Some(data) = chunk.content().data() else {
         return chunk.clone();
     };
@@ -78,6 +135,12 @@ fn vp8x_without_metadata_flags(chunk: &RiffChunk) -> RiffChunk {
     }
     let mut buf = data.to_vec();
     buf[0] &= !(VP8X_FLAG_EXIF | VP8X_FLAG_XMP);
+    if exif {
+        buf[0] |= VP8X_FLAG_EXIF;
+    }
+    if xmp {
+        buf[0] |= VP8X_FLAG_XMP;
+    }
     RiffChunk::new(CHUNK_VP8X, RiffContent::Data(Bytes::from(buf)))
 }
 

@@ -2,12 +2,15 @@ use leptos::prelude::*;
 use muda_core::{ImageKind, StripReport};
 
 use super::io::{download_bytes, format_bytes};
-use super::model::{FileItem, Status};
+use super::model::{FileItem, KeepSelection, Status};
 use super::size::file_warning;
 use super::strip::run_strip_queue;
 
 #[component]
-pub(crate) fn FileQueue(items: RwSignal<Vec<FileItem>>) -> impl IntoView {
+pub(crate) fn FileQueue(
+    items: RwSignal<Vec<FileItem>>,
+    keep: RwSignal<KeepSelection>,
+) -> impl IntoView {
     view! {
         <Show
             when=move || !items.get().is_empty()
@@ -22,7 +25,7 @@ pub(crate) fn FileQueue(items: RwSignal<Vec<FileItem>>) -> impl IntoView {
                     each=move || items.get()
                     key=|item| item.id
                     children=move |item| {
-                        view! { <FileRow item=item items=items /> }
+                        view! { <FileRow item=item items=items keep=keep /> }
                     }
                 />
             </ul>
@@ -31,7 +34,11 @@ pub(crate) fn FileQueue(items: RwSignal<Vec<FileItem>>) -> impl IntoView {
 }
 
 #[component]
-fn FileRow(item: FileItem, items: RwSignal<Vec<FileItem>>) -> impl IntoView {
+fn FileRow(
+    item: FileItem,
+    items: RwSignal<Vec<FileItem>>,
+    keep: RwSignal<KeepSelection>,
+) -> impl IntoView {
     let preview = item.preview_url.clone();
     on_cleanup(move || {
         if !preview.is_empty() {
@@ -44,7 +51,7 @@ fn FileRow(item: FileItem, items: RwSignal<Vec<FileItem>>) -> impl IntoView {
         if item_strip.kind.is_none() {
             return;
         }
-        run_strip_queue(vec![item_strip.clone()]);
+        run_strip_queue(vec![item_strip.clone()], keep.get().families());
     };
 
     let item_dl = item.clone();
@@ -173,30 +180,28 @@ fn ReportView(
     view! {
         <Show when=move || report.get().is_some()>
             {move || {
-                let Some(r) = report.get() else {
-                    return view! { <></> }.into_any();
-                };
-                let out = output_len.get().map(|b| b.len()).unwrap_or(r.output_bytes);
-                let tags = r
-                    .removed
-                    .iter()
-                    .map(|t| format!("{}: {}", t.family.as_str(), t.label))
-                    .collect::<Vec<_>>()
-                    .join(" · ");
-                let families = unique_families(&r);
-                view! {
-                    <div class="report">
-                        <p>
-                            {format_bytes(r.input_bytes)}
-                            " → "
-                            {format_bytes(out)}
-                            " · removed "
-                            {families}
-                        </p>
-                        <p class="muted tags">{tags}</p>
-                    </div>
-                }
-                .into_any()
+                report.get().map(|r| {
+                    let out = output_len.get().map(|b| b.len()).unwrap_or(r.output_bytes);
+                    let tags = r
+                        .removed
+                        .iter()
+                        .map(|t| format!("{}: {}", t.family.as_str(), t.label))
+                        .collect::<Vec<_>>()
+                        .join(" · ");
+                    let families = unique_families(&r);
+                    view! {
+                        <div class="report">
+                            <p>
+                                {format_bytes(r.input_bytes)}
+                                " → "
+                                {format_bytes(out)}
+                                " · removed "
+                                {families}
+                            </p>
+                            <p class="muted tags">{tags}</p>
+                        </div>
+                    }
+                })
             }}
         </Show>
     }

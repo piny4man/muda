@@ -19,8 +19,8 @@ mod toolbar;
 
 pub use server::{health, upload_unsupported};
 
-use home::HomePage;
 use chrome::SiteFooter;
+use home::HomePage;
 
 pub fn shell(options: LeptosOptions) -> impl IntoView {
     view! {

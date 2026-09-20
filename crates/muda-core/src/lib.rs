@@ -3,16 +3,13 @@
 //! Color profiles (`iCCP` / `sRGB` / JPEG ICC APP2 / Adobe APP14 / WebP ICCP) are kept.
 //! Compressed image scans are not re-encoded.
 
+mod exif_rewrite;
 mod jpeg;
 mod png;
 mod webp;
 
 use std::fmt;
 use std::io::Cursor;
-
-pub use jpeg::strip_jpeg;
-pub use png::strip_png;
-pub use webp::strip_webp;
 
 const JPEG_SOI: &[u8] = &[0xFF, 0xD8];
 const PNG_SIGNATURE: &[u8] = &[0x89, 0x50, 0x4E, 0x47, 0x0D, 0x0A, 0x1A, 0x0A];
@@ -115,22 +112,38 @@ fn is_webp(bytes: &[u8]) -> bool {
 /// Strip identity metadata and return **new** bytes plus a report.
 /// The input buffer is never mutated.
 pub fn strip_image(name: &str, data: &[u8]) -> Result<(Vec<u8>, StripReport), StripError> {
+    strip_image_selective(name, data, &[])
+}
+
+/// Strip identity metadata, keeping only the requested tag families.
+///
+/// Keep is a whitelist. XMP, Photoshop IRB, thumbnails, and other EXIF fields
+/// (dates, orientation, exposure) are always removed. Empty `keep_families`
+/// matches [`strip_image`].
+pub fn strip_image_selective(
+    name: &str,
+    data: &[u8],
+    keep_families: &[TagFamily],
+) -> Result<(Vec<u8>, StripReport), StripError> {
     match sniff_kind(data) {
-        Some(ImageKind::Jpeg) => strip_jpeg(name, data),
-        Some(ImageKind::Png) => strip_png(name, data),
-        Some(ImageKind::WebP) => strip_webp(name, data),
+        Some(ImageKind::Jpeg) => jpeg::strip_jpeg(name, data, keep_families),
+        Some(ImageKind::Png) => png::strip_png(name, data, keep_families),
+        Some(ImageKind::WebP) => webp::strip_webp(name, data, keep_families),
         None => Err(StripError::Unsupported),
     }
 }
 
-/// Reserved for a future UI that lets the user keep selected tag families.
-/// v1 still strips all identity metadata and keeps color profiles.
-pub fn strip_image_selective(
-    name: &str,
-    data: &[u8],
-    _keep_families: &[TagFamily],
-) -> Result<(Vec<u8>, StripReport), StripError> {
-    strip_image(name, data)
+/// Full strip (no families kept). Public wrapper around the format decoder.
+pub fn strip_jpeg(name: &str, data: &[u8]) -> Result<(Vec<u8>, StripReport), StripError> {
+    jpeg::strip_jpeg(name, data, &[])
+}
+
+pub fn strip_png(name: &str, data: &[u8]) -> Result<(Vec<u8>, StripReport), StripError> {
+    png::strip_png(name, data, &[])
+}
+
+pub fn strip_webp(name: &str, data: &[u8]) -> Result<(Vec<u8>, StripReport), StripError> {
+    webp::strip_webp(name, data, &[])
 }
 
 pub(crate) fn cleaned_output_name(original: &str, kind: ImageKind) -> String {
@@ -197,8 +210,43 @@ fn classify_exif_field(field: &exif::Field) -> TagFamily {
         | exif::Tag::ImageDescription
         | exif::Tag::Artist
         | exif::Tag::Copyright => TagFamily::Comment,
-        exif::Tag::Make | exif::Tag::Model | exif::Tag::MakerNote => TagFamily::Camera,
+        exif::Tag::Make
+        | exif::Tag::Model
+        | exif::Tag::MakerNote
+        | exif::Tag::BodySerialNumber
+        | exif::Tag::CameraOwnerName
+        | exif::Tag::LensMake
+        | exif::Tag::LensModel
+        | exif::Tag::LensSerialNumber => TagFamily::Camera,
         _ => TagFamily::Other,
+    }
+}
+
+pub(crate) fn drop_unkept(tags: Vec<RemovedTag>, keep: &[TagFamily]) -> Vec<RemovedTag> {
+    tags.into_iter()
+        .filter(|tag| !keep.contains(&tag.family))
+        .collect()
+}
+
+pub(crate) fn xmp_dropped_warning() -> String {
+    "XMP was dropped; duplicated tags in XMP were not kept".to_string()
+}
+
+pub(crate) fn maybe_makernote_warning(
+    original: &[RemovedTag],
+    keep: &[TagFamily],
+    warnings: &mut Vec<String>,
+) {
+    if keep.contains(&TagFamily::Camera) && !keep.contains(&TagFamily::Gps) {
+        let has_maker_note = original
+            .iter()
+            .any(|tag| tag.family == TagFamily::Camera && tag.label.contains("MakerNote"));
+        if has_maker_note {
+            warnings.push(
+                "MakerNote kept with Camera; it may still contain location or serial data"
+                    .to_string(),
+            );
+        }
     }
 }
 

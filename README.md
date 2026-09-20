@@ -9,7 +9,7 @@
   Files are processed in your browser. Nothing is uploaded.
 </p>
 
-**muda** (無駄, “waste”) strips identity metadata from images — GPS, camera, software, comments, XMP, Photoshop IRB, embedded thumbnails — and leaves the pixels alone.
+**muda** (無駄, “waste”) strips identity metadata from images — GPS, camera, software, comments, XMP, Photoshop IRB, embedded thumbnails — and leaves the pixels alone. GPS, camera, software, and comments can be kept if you check them; XMP and thumbnails always go.
 
 Color profiles stay (`iCCP` / `sRGB` / JPEG ICC / Adobe APP14 / WebP `ICCP`), so colors do not shift. The compressed image data is copied, not decoded and re-encoded.
 
@@ -24,13 +24,13 @@ Color profiles stay (`iCCP` / `sRGB` / JPEG ICC / Adobe APP14 / WebP `ICCP`), so
 
 ## How it works
 
-Drop files, **Strip**, download. Work runs in WASM (`muda-core`) inside the page. The server only ships HTML, CSS, and WASM.
+Drop files, optionally keep selected tag families, **Strip**, download. Work runs in WASM (`muda-core`) inside the page. The server only ships HTML, CSS, and WASM.
 
-Lossless **container rewrite** with [`img-parts`](https://crates.io/crates/img-parts). [`kamadak-exif`](https://crates.io/crates/kamadak-exif) is read-only, for the per-file report of what left.
+Lossless **container rewrite** with [`img-parts`](https://crates.io/crates/img-parts). [`kamadak-exif`](https://crates.io/crates/kamadak-exif) is read-only, for the per-file report of what left. Kept EXIF families are rewritten at the TIFF field level so GPS, camera, software, and comments can stay independently.
 
-- **JPEG** — drop APP1 (Exif / XMP), COM, Photoshop APP13, other metadata APPn. Keep JFIF APP0, ICC APP2, Adobe APP14.
-- **PNG** — keep `IHDR`, `PLTE`, `IDAT`, `IEND`, and color/correctness chunks (`tRNS`, `gAMA`, `cHRM`, `sRGB`, `iCCP`, `pHYs`, …). Drop `eXIf`, `tEXt`, `zTXt`, `iTXt`, `tIME`.
-- **WebP** — drop `EXIF` and `XMP ` chunks. Keep `VP8` / `VP8L` / `VP8X` / `ALPH` / `ANIM` / `ANMF` / `ICCP`.
+- **JPEG** — drop XMP, Photoshop APP13, other metadata APPn, and unkept EXIF fields. Keep JFIF APP0, ICC APP2, Adobe APP14. Keep COM / selected EXIF families when asked.
+- **PNG** — keep `IHDR`, `PLTE`, `IDAT`, `IEND`, and color/correctness chunks (`tRNS`, `gAMA`, `cHRM`, `sRGB`, `iCCP`, `pHYs`, …). Drop `tIME`. Keep `eXIf` / text chunks only for selected families.
+- **WebP** — always drop `XMP `. Keep `VP8` / `VP8L` / `VP8X` / `ALPH` / `ANIM` / `ANMF` / `ICCP`. Rewrite or drop `EXIF` to match the keep list.
 
 ## Workspace
 
