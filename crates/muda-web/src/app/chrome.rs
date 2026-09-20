@@ -1,14 +1,44 @@
 use leptos::prelude::*;
 
+use super::model::KeepSelection;
+
 #[component]
-pub(crate) fn SelectiveStub() -> impl IntoView {
+pub(crate) fn KeepTags(keep: RwSignal<KeepSelection>) -> impl IntoView {
     view! {
-        <fieldset class="selective" disabled>
-            <legend>"Keep selected tags (coming soon)"</legend>
-            <label><input type="checkbox" disabled/> " GPS"</label>
-            <label><input type="checkbox" disabled/> " Camera"</label>
-            <label><input type="checkbox" disabled/> " Software"</label>
-            <label><input type="checkbox" disabled/> " Comments"</label>
+        <fieldset class="selective">
+            <legend>"Keep selected tags"</legend>
+            <label>
+                <input
+                    type="checkbox"
+                    prop:checked=move || keep.get().gps
+                    on:change=move |ev| keep.update(|k| k.gps = event_target_checked(&ev))
+                />
+                " GPS"
+            </label>
+            <label>
+                <input
+                    type="checkbox"
+                    prop:checked=move || keep.get().camera
+                    on:change=move |ev| keep.update(|k| k.camera = event_target_checked(&ev))
+                />
+                " Camera"
+            </label>
+            <label>
+                <input
+                    type="checkbox"
+                    prop:checked=move || keep.get().software
+                    on:change=move |ev| keep.update(|k| k.software = event_target_checked(&ev))
+                />
+                " Software"
+            </label>
+            <label>
+                <input
+                    type="checkbox"
+                    prop:checked=move || keep.get().comment
+                    on:change=move |ev| keep.update(|k| k.comment = event_target_checked(&ev))
+                />
+                " Comments"
+            </label>
         </fieldset>
     }
 }
@@ -23,7 +53,7 @@ pub(crate) fn PrivacyFooter() -> impl IntoView {
             </p>
             <p>
                 <strong>"Color profile kept. "</strong>
-                "ICC / sRGB (and JPEG Adobe APP14) stay in the file so colors do not shift. GPS, camera, software, comments, XMP, and thumbnails are removed."
+                "ICC / sRGB (and JPEG Adobe APP14) stay in the file so colors do not shift. XMP and thumbnails are always removed. GPS, camera, software, and comments are removed unless you keep them."
             </p>
             <p class="muted">
                 "Lossless container rewrite via img-parts. Image scans are not re-encoded."

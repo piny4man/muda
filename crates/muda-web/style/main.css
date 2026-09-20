@@ -273,7 +273,6 @@ button:active:not(:disabled) {
   border: 2px solid var(--line);
   padding: 0.75rem 1rem 1rem;
   margin: 0 0 1.25rem;
-  opacity: 0.55;
 }
 
 .selective legend {
@@ -284,7 +283,13 @@ button:active:not(:disabled) {
   text-transform: uppercase;
 }
 
-.selective label { margin-right: 0.9rem; }
+.selective label {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  min-height: 44px;
+  margin-right: 0.9rem;
+}
 
 .files {
   list-style: none;

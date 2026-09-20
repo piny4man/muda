@@ -1,9 +1,10 @@
-use img_parts::png::Png;
+use img_parts::png::{Png, PngChunk};
 use img_parts::Bytes;
 
+use crate::exif_rewrite::rewrite_exif_tiff;
 use crate::{
-    cleaned_output_name, parse_exif_raw, truncate, ImageKind, RemovedTag, StripError, StripReport,
-    TagFamily,
+    cleaned_output_name, drop_unkept, maybe_makernote_warning, parse_exif_raw, truncate, ImageKind,
+    RemovedTag, StripError, StripReport, TagFamily,
 };
 
 /// Chunks required for a correct, displayable PNG (color, not identity).
@@ -12,11 +13,16 @@ const KEEP_TYPES: &[[u8; 4]] = &[
     *b"pHYs", *b"bKGD", *b"sBIT",
 ];
 
-pub fn strip_png(name: &str, data: &[u8]) -> Result<(Vec<u8>, StripReport), StripError> {
+pub(crate) fn strip_png(
+    name: &str,
+    data: &[u8],
+    keep: &[TagFamily],
+) -> Result<(Vec<u8>, StripReport), StripError> {
     let png = Png::from_bytes(Bytes::copy_from_slice(data))
         .map_err(|e| StripError::InvalidImage(e.to_string()))?;
 
     let mut removed = Vec::new();
+    let mut warnings = Vec::new();
     let mut kept = Vec::new();
 
     for chunk in png.chunks() {
@@ -25,7 +31,23 @@ pub fn strip_png(name: &str, data: &[u8]) -> Result<(Vec<u8>, StripReport), Stri
             kept.push(chunk.clone());
             continue;
         }
-        removed.extend(tags_for_dropped_chunk(kind, chunk.contents()));
+        if &kind == b"eXIf" {
+            let tags = parse_exif_raw(chunk.contents());
+            maybe_makernote_warning(&tags, keep, &mut warnings);
+            removed.extend(drop_unkept(tags.clone(), keep));
+            if let Some(tiff) = rewrite_exif_tiff(chunk.contents(), keep) {
+                kept.push(PngChunk::new(*b"eXIf", Bytes::from(tiff)));
+            } else if tags.is_empty() {
+                removed.extend(tags_for_dropped_chunk(kind, chunk.contents()));
+            }
+            continue;
+        }
+        let tags = tags_for_dropped_chunk(kind, chunk.contents());
+        if tags.iter().any(|tag| keep.contains(&tag.family)) {
+            kept.push(chunk.clone());
+        } else {
+            removed.extend(tags);
+        }
     }
 
     let mut rebuilt = png;
@@ -41,7 +63,7 @@ pub fn strip_png(name: &str, data: &[u8]) -> Result<(Vec<u8>, StripReport), Stri
         kind: ImageKind::Png,
         output_name: cleaned_output_name(name, ImageKind::Png),
         removed,
-        warnings: Vec::new(),
+        warnings,
         input_bytes: data.len(),
         output_bytes: output.len(),
     };
