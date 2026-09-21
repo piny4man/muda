@@ -49,14 +49,14 @@ pub(crate) fn PrivacyFooter() -> impl IntoView {
         <footer class="foot">
             <p>
                 <strong>"Formats: "</strong>
-                "JPEG, PNG, and WebP in v1. HEIC, RAW, TIFF, PDF, video, and audio are not supported."
+                "JPEG, PNG, WebP, and PDF in v1. HEIC, RAW, TIFF, video, and audio are not supported."
             </p>
             <p>
                 <strong>"Color profile kept. "</strong>
-                "ICC / sRGB (and JPEG Adobe APP14) stay in the file so colors do not shift. XMP and thumbnails are always removed. GPS, camera, software, and comments are removed unless you keep them."
+                "ICC / sRGB (and JPEG Adobe APP14) stay in the file so colors do not shift. XMP and thumbnails are always removed. GPS, camera, software, and comments are removed unless you keep them. PDF text stays. Document info, the trailer ID, and tags inside embedded JPEGs are removed. Encrypted PDFs are rejected."
             </p>
             <p class="muted">
-                "Lossless container rewrite via img-parts. Image scans are not re-encoded."
+                "Lossless container rewrite via img-parts. Image scans are not re-encoded. PDFs are rebuilt in one generation so older revisions are dropped."
             </p>
         </footer>
     }

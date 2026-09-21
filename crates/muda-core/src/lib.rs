@@ -1,10 +1,12 @@
-//! Lossless JPEG/PNG/WebP container rewrite that strips identity metadata.
+//! Identity-metadata strip for JPEG, PNG, WebP, and PDF.
 //!
-//! Color profiles (`iCCP` / `sRGB` / JPEG ICC APP2 / Adobe APP14 / WebP ICCP) are kept.
+//! Image color profiles (`iCCP` / `sRGB` / JPEG ICC APP2 / Adobe APP14 / WebP ICCP) are kept.
 //! Compressed image scans are not re-encoded.
+//! A PDF is rebuilt as one generation so older revisions are not appended. Page content is not rendered.
 
 mod exif_rewrite;
 mod jpeg;
+mod pdf;
 mod png;
 mod webp;
 
@@ -15,10 +17,11 @@ const JPEG_SOI: &[u8] = &[0xFF, 0xD8];
 const PNG_SIGNATURE: &[u8] = &[0x89, 0x50, 0x4E, 0x47, 0x0D, 0x0A, 0x1A, 0x0A];
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
-pub enum ImageKind {
+pub enum FileKind {
     Jpeg,
     Png,
     WebP,
+    Pdf,
 }
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -63,7 +66,7 @@ pub struct RemovedTag {
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct StripReport {
     pub original_name: String,
-    pub kind: ImageKind,
+    pub kind: FileKind,
     pub output_name: String,
     pub removed: Vec<RemovedTag>,
     pub warnings: Vec<String>,
@@ -82,7 +85,7 @@ impl fmt::Display for StripError {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
             StripError::Unsupported => {
-                f.write_str("unsupported format (only JPEG, PNG, and WebP in v1)")
+                f.write_str("unsupported format (only JPEG, PNG, WebP, and PDF)")
             }
             StripError::InvalidImage(msg) => write!(f, "invalid image: {msg}"),
             StripError::Encode(msg) => write!(f, "encode failed: {msg}"),
@@ -92,17 +95,25 @@ impl fmt::Display for StripError {
 
 impl std::error::Error for StripError {}
 
-/// Detect JPEG (`FF D8`), PNG, or WebP (`RIFF….WEBP`). Other RIFF is unsupported.
-pub fn sniff_kind(bytes: &[u8]) -> Option<ImageKind> {
+/// Detect JPEG (`FF D8`), PNG, WebP (`RIFF….WEBP`), or PDF (`%PDF-` in the first 1024 bytes).
+/// Other RIFF is unsupported.
+pub fn sniff_kind(bytes: &[u8]) -> Option<FileKind> {
     if bytes.starts_with(JPEG_SOI) {
-        Some(ImageKind::Jpeg)
+        Some(FileKind::Jpeg)
     } else if bytes.starts_with(PNG_SIGNATURE) {
-        Some(ImageKind::Png)
+        Some(FileKind::Png)
     } else if is_webp(bytes) {
-        Some(ImageKind::WebP)
+        Some(FileKind::WebP)
+    } else if is_pdf(bytes) {
+        Some(FileKind::Pdf)
     } else {
         None
     }
+}
+
+fn is_pdf(bytes: &[u8]) -> bool {
+    let window = &bytes[..bytes.len().min(1024)];
+    window.windows(5).any(|candidate| candidate == b"%PDF-")
 }
 
 fn is_webp(bytes: &[u8]) -> bool {
@@ -126,9 +137,10 @@ pub fn strip_image_selective(
     keep_families: &[TagFamily],
 ) -> Result<(Vec<u8>, StripReport), StripError> {
     match sniff_kind(data) {
-        Some(ImageKind::Jpeg) => jpeg::strip_jpeg(name, data, keep_families),
-        Some(ImageKind::Png) => png::strip_png(name, data, keep_families),
-        Some(ImageKind::WebP) => webp::strip_webp(name, data, keep_families),
+        Some(FileKind::Jpeg) => jpeg::strip_jpeg(name, data, keep_families),
+        Some(FileKind::Png) => png::strip_png(name, data, keep_families),
+        Some(FileKind::WebP) => webp::strip_webp(name, data, keep_families),
+        Some(FileKind::Pdf) => pdf::strip_pdf(name, data, keep_families),
         None => Err(StripError::Unsupported),
     }
 }
@@ -146,7 +158,7 @@ pub fn strip_webp(name: &str, data: &[u8]) -> Result<(Vec<u8>, StripReport), Str
     webp::strip_webp(name, data, &[])
 }
 
-pub(crate) fn cleaned_output_name(original: &str, kind: ImageKind) -> String {
+pub(crate) fn cleaned_output_name(original: &str, kind: FileKind) -> String {
     let file_name = original
         .rsplit(['/', '\\'])
         .next()
@@ -157,9 +169,10 @@ pub(crate) fn cleaned_output_name(original: &str, kind: ImageKind) -> String {
         _ => file_name,
     };
     let ext = match kind {
-        ImageKind::Jpeg => "jpg",
-        ImageKind::Png => "png",
-        ImageKind::WebP => "webp",
+        FileKind::Jpeg => "jpg",
+        FileKind::Png => "png",
+        FileKind::WebP => "webp",
+        FileKind::Pdf => "pdf",
     };
     format!("{stem}.cleaned.{ext}")
 }
@@ -269,17 +282,24 @@ mod tests {
 
     #[test]
     fn sniff_jpeg_png_and_garbage() {
-        assert_eq!(sniff_kind(&[0xFF, 0xD8, 0xFF]), Some(ImageKind::Jpeg));
-        assert_eq!(sniff_kind(PNG_SIGNATURE), Some(ImageKind::Png));
+        assert_eq!(sniff_kind(&[0xFF, 0xD8, 0xFF]), Some(FileKind::Jpeg));
+        assert_eq!(sniff_kind(PNG_SIGNATURE), Some(FileKind::Png));
         let mut webp = [0u8; 12];
         webp[..4].copy_from_slice(b"RIFF");
         webp[8..12].copy_from_slice(b"WEBP");
-        assert_eq!(sniff_kind(&webp), Some(ImageKind::WebP));
+        assert_eq!(sniff_kind(&webp), Some(FileKind::WebP));
         assert_eq!(sniff_kind(b"RIFF\x00\x00\x00\x00WAVE"), None);
         assert_eq!(sniff_kind(&[]), None);
         assert_eq!(sniff_kind(&[0xFF]), None);
         assert_eq!(sniff_kind(b"not an image"), None);
         assert_eq!(sniff_kind(&[0x89, 0x50]), None);
+        assert_eq!(sniff_kind(b"%PDF-1.7\n"), Some(FileKind::Pdf));
+        let mut preamble = vec![b' '; 32];
+        preamble.extend_from_slice(b"%PDF-1.4\n");
+        assert_eq!(sniff_kind(&preamble), Some(FileKind::Pdf));
+        let mut late = vec![0u8; 1020];
+        late.extend_from_slice(b"%PDF-");
+        assert_eq!(sniff_kind(&late), None);
     }
 
     #[test]
@@ -293,20 +313,24 @@ mod tests {
     #[test]
     fn cleaned_names() {
         assert_eq!(
-            cleaned_output_name("photo.jpg", ImageKind::Jpeg),
+            cleaned_output_name("photo.jpg", FileKind::Jpeg),
             "photo.cleaned.jpg"
         );
         assert_eq!(
-            cleaned_output_name("/tmp/vacation.PNG", ImageKind::Png),
+            cleaned_output_name("/tmp/vacation.PNG", FileKind::Png),
             "vacation.cleaned.png"
         );
         assert_eq!(
-            cleaned_output_name("noext", ImageKind::Jpeg),
+            cleaned_output_name("noext", FileKind::Jpeg),
             "noext.cleaned.jpg"
         );
         assert_eq!(
-            cleaned_output_name("chat.webp", ImageKind::WebP),
+            cleaned_output_name("chat.webp", FileKind::WebP),
             "chat.cleaned.webp"
+        );
+        assert_eq!(
+            cleaned_output_name("notes.pdf", FileKind::Pdf),
+            "notes.cleaned.pdf"
         );
     }
 }

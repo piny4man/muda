@@ -13,7 +13,7 @@ use super::model::{FileItem, KeepSelection, Status};
 use super::queue::FileQueue;
 use super::size::queue_warning;
 use super::strip::run_strip_queue;
-use super::toolbar::Toolbar;
+use super::toolbar::{toolbar_disabled, Toolbar};
 
 #[component]
 pub(crate) fn HomePage() -> impl IntoView {
@@ -49,7 +49,7 @@ pub(crate) fn HomePage() -> impl IntoView {
                     (
                         Status::Unsupported,
                         Some(
-                            "Not a JPEG, PNG, or WebP. This format is not supported in v1."
+                            "Not a JPEG, PNG, WebP, or PDF. This format is not supported in v1."
                                 .to_string(),
                         ),
                     )
@@ -163,7 +163,12 @@ pub(crate) fn HomePage() -> impl IntoView {
                     ).unwrap_or_default()}
                 </p>
             </Show>
-            <Toolbar strip_all=strip_all download_all=download_all clear=clear />
+            <Toolbar
+                strip_all=strip_all
+                download_all=download_all
+                clear=clear
+                disabled=Signal::derive(move || toolbar_disabled(items.get().len()))
+            />
             <KeepTags keep=keep />
             <FileQueue items=items keep=keep />
             <PrivacyFooter/>

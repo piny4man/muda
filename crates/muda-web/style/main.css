@@ -212,12 +212,13 @@ button {
   padding: 0.6rem 0.85rem;
   border-radius: 0;
   cursor: pointer;
+  transition: all ease-in-out 100ms;
 }
 
 button.primary {
   background: var(--accent);
   color: var(--accent-ink);
-  border-color: var(--ink);
+  border-color: var(--accent);
 }
 
 button.ghost { background: transparent; }
@@ -253,7 +254,7 @@ button:focus-visible,
   }
   button.primary:hover:not(:disabled) {
     background: var(--ink);
-    color: var(--accent);
+    border-color: var(--ink);
   }
 }
 
@@ -310,12 +311,25 @@ button:active:not(:disabled) {
 }
 
 .thumb, .thumb.placeholder {
-  width: 56px;
-  height: 56px;
+  width: auto;
+  height: 100%;
+  aspect-ratio: 1/1;
   object-fit: cover;
   border-radius: 0;
   border: 2px solid var(--line);
   background: var(--line);
+}
+
+.thumb.placeholder.pdf {
+  display: grid;
+  place-items: center;
+  border-color: var(--accent);
+  background: transparent;
+  color: var(--accent);
+  font-family: var(--mono);
+  font-size: 0.9rem;
+  font-weight: 600;
+  letter-spacing: 0.08em;
 }
 
 .file-head {

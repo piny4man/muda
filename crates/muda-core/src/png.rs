@@ -3,7 +3,7 @@ use img_parts::Bytes;
 
 use crate::exif_rewrite::rewrite_exif_tiff;
 use crate::{
-    cleaned_output_name, drop_unkept, maybe_makernote_warning, parse_exif_raw, truncate, ImageKind,
+    cleaned_output_name, drop_unkept, maybe_makernote_warning, parse_exif_raw, truncate, FileKind,
     RemovedTag, StripError, StripReport, TagFamily,
 };
 
@@ -60,8 +60,8 @@ pub(crate) fn strip_png(
 
     let report = StripReport {
         original_name: name.to_string(),
-        kind: ImageKind::Png,
-        output_name: cleaned_output_name(name, ImageKind::Png),
+        kind: FileKind::Png,
+        output_name: cleaned_output_name(name, FileKind::Png),
         removed,
         warnings,
         input_bytes: data.len(),

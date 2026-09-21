@@ -8,7 +8,7 @@ use img_parts::Bytes;
 use crate::exif_rewrite::{rewrite_exif_tiff, tiff_from_exif_payload};
 use crate::{
     cleaned_output_name, drop_unkept, maybe_makernote_warning, parse_exif_raw, xmp_dropped_warning,
-    ImageKind, RemovedTag, StripError, StripReport, TagFamily,
+    FileKind, RemovedTag, StripError, StripReport, TagFamily,
 };
 
 /// VP8X feature flags for EXIF (bit 3) and XMP (bit 2).
@@ -80,8 +80,8 @@ pub(crate) fn strip_webp(
 
     let report = StripReport {
         original_name: name.to_string(),
-        kind: ImageKind::WebP,
-        output_name: cleaned_output_name(name, ImageKind::WebP),
+        kind: FileKind::WebP,
+        output_name: cleaned_output_name(name, FileKind::WebP),
         removed,
         warnings,
         input_bytes: data.len(),
