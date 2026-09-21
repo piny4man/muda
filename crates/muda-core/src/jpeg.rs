@@ -4,7 +4,7 @@ use img_parts::Bytes;
 use crate::exif_rewrite::{jpeg_exif_payload, rewrite_exif_tiff, tiff_from_exif_payload};
 use crate::{
     cleaned_output_name, drop_unkept, latin1_lossy, maybe_makernote_warning, parse_exif_fields,
-    truncate, xmp_dropped_warning, ImageKind, RemovedTag, StripError, StripReport, TagFamily,
+    truncate, xmp_dropped_warning, FileKind, RemovedTag, StripError, StripReport, TagFamily,
 };
 
 const JFIF_IDENT: &[u8] = b"JFIF\0";
@@ -89,8 +89,8 @@ pub(crate) fn strip_jpeg(
 
     let report = StripReport {
         original_name: name.to_string(),
-        kind: ImageKind::Jpeg,
-        output_name: cleaned_output_name(name, ImageKind::Jpeg),
+        kind: FileKind::Jpeg,
+        output_name: cleaned_output_name(name, FileKind::Jpeg),
         removed,
         warnings,
         input_bytes: data.len(),

@@ -3,13 +3,22 @@ name = "muda-core"
 version.workspace = true
 edition.workspace = true
 license.workspace = true
-description = "Lossless JPEG/PNG/WebP container rewrite that strips identity metadata"
-rust-version = "1.85"
+description = "Identity-metadata strip for JPEG, PNG, WebP, and PDF"
+rust-version = "1.88"
 
 [dependencies]
+getrandom = "0.4"
 img-parts = "0.4"
 kamadak-exif = "0.6"
+lopdf = { version = "0.45", default-features = false }
+
+# getrandom 0.4 refuses wasm32-unknown-unknown unless its JS backend is selected.
+# muda-web already links wasm-bindgen, so this backend is only enabled for that target.
+[target.'cfg(all(target_arch = "wasm32", target_os = "unknown"))'.dependencies]
+getrandom = { version = "0.4", features = ["wasm_js"] }
+lopdf = { version = "0.45", default-features = false, features = ["wasm_js"] }
 
 [dev-dependencies]
 image = { version = "0.25", default-features = false, features = ["jpeg", "png"] }
 kamadak-exif = "0.6"
+lopdf = { version = "0.45", default-features = false }

@@ -6,11 +6,11 @@ product
 
 ## Users
 
-People about to send or post a JPEG, PNG, or WebP: on a phone, in a hurry, slightly anxious about GPS and camera tags. They are not photographers managing an archive. They drop files, strip, download, leave.
+People about to send or post a JPEG, PNG, WebP, or PDF: on a phone, in a hurry, slightly anxious about GPS, camera tags, and document authors. They are not photographers managing an archive. They drop files, strip, download, leave.
 
 ## Product Purpose
 
-muda erases identity metadata from JPEG, PNG, and WebP in the browser. Files are never uploaded. Success is a cleaned download and a short report of what was removed, with no doubt that pixels stayed local.
+muda erases identity metadata from JPEG, PNG, WebP, and PDF in the browser. Files are never uploaded. Success is a cleaned download and a short report of what was removed, with no doubt that pixels and PDF text stayed local.
 
 ## Brand Personality
 

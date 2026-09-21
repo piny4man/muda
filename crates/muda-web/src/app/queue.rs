@@ -1,5 +1,5 @@
 use leptos::prelude::*;
-use muda_core::{ImageKind, StripReport};
+use muda_core::{FileKind, StripReport};
 
 use super::io::{download_bytes, format_bytes};
 use super::model::{FileItem, KeepSelection, Status};
@@ -16,7 +16,7 @@ pub(crate) fn FileQueue(
             when=move || !items.get().is_empty()
             fallback=|| view! {
                 <p class="empty">
-                    "No files yet. Add JPEG, PNG, or WebP images to strip metadata in your browser."
+                    "No files yet. Add JPEG, PNG, WebP, or PDF files to strip metadata in your browser."
                 </p>
             }
         >
@@ -65,9 +65,10 @@ fn FileRow(
             .map(|r| r.output_name.clone())
             .unwrap_or_else(|| format!("{}.cleaned", item_dl.name));
         let mime = match item_dl.kind {
-            Some(ImageKind::Png) => "image/png",
-            Some(ImageKind::WebP) => "image/webp",
-            Some(ImageKind::Jpeg) | None => "image/jpeg",
+            Some(FileKind::Png) => "image/png",
+            Some(FileKind::WebP) => "image/webp",
+            Some(FileKind::Pdf) => "application/pdf",
+            Some(FileKind::Jpeg) | None => "image/jpeg",
         };
         let _ = download_bytes(&name, mime, &bytes);
     };
@@ -86,17 +87,30 @@ fn FileRow(
     };
 
     let kind_label = match item.kind {
-        Some(ImageKind::Jpeg) => "JPEG",
-        Some(ImageKind::Png) => "PNG",
-        Some(ImageKind::WebP) => "WebP",
+        Some(FileKind::Jpeg) => "JPEG",
+        Some(FileKind::Png) => "PNG",
+        Some(FileKind::WebP) => "WebP",
+        Some(FileKind::Pdf) => "PDF",
         None => "unsupported",
     };
     let large_warning = item.kind.and_then(|_| file_warning(item.size));
     let display_name = item.name.clone();
     let thumb_src = item.preview_url.clone();
-    let show_thumb = !preview_url.is_empty() && item.kind.is_some();
+    let show_thumb = !preview_url.is_empty()
+        && matches!(
+            item.kind,
+            Some(FileKind::Jpeg | FileKind::Png | FileKind::WebP)
+        );
+    let show_pdf = shows_pdf_placeholder(item.kind);
     let thumb_view = if show_thumb {
         view! { <img class="thumb" src=thumb_src alt=display_name.clone() /> }.into_any()
+    } else if show_pdf {
+        view! {
+            <div class="thumb placeholder pdf" aria-hidden="true">
+                "PDF"
+            </div>
+        }
+        .into_any()
     } else {
         view! { <div class="thumb placeholder" aria-hidden="true"></div> }.into_any()
     };
@@ -207,6 +221,11 @@ fn ReportView(
     }
 }
 
+/// PDFs have no raster preview, so the thumbnail shows a document tag instead.
+pub(crate) fn shows_pdf_placeholder(kind: Option<FileKind>) -> bool {
+    matches!(kind, Some(FileKind::Pdf))
+}
+
 pub(crate) fn unique_families(report: &StripReport) -> String {
     let mut seen = Vec::new();
     for tag in &report.removed {
@@ -224,14 +243,14 @@ pub(crate) fn unique_families(report: &StripReport) -> String {
 
 #[cfg(test)]
 mod tests {
-    use muda_core::{ImageKind, RemovedTag, StripReport, TagFamily};
+    use muda_core::{FileKind, RemovedTag, StripReport, TagFamily};
 
-    use super::unique_families;
+    use super::{shows_pdf_placeholder, unique_families};
 
     fn report(removed: Vec<RemovedTag>) -> StripReport {
         StripReport {
             original_name: "shot.jpg".into(),
-            kind: ImageKind::Jpeg,
+            kind: FileKind::Jpeg,
             output_name: "shot.cleaned.jpg".into(),
             removed,
             warnings: Vec::new(),
@@ -250,6 +269,15 @@ mod tests {
     #[test]
     fn unique_families_empty() {
         assert_eq!(unique_families(&report(vec![])), "no identity tags found");
+    }
+
+    #[test]
+    fn pdf_gets_placeholder_but_images_do_not() {
+        assert!(shows_pdf_placeholder(Some(FileKind::Pdf)));
+        assert!(!shows_pdf_placeholder(Some(FileKind::Jpeg)));
+        assert!(!shows_pdf_placeholder(Some(FileKind::Png)));
+        assert!(!shows_pdf_placeholder(Some(FileKind::WebP)));
+        assert!(!shows_pdf_placeholder(None));
     }
 
     #[test]

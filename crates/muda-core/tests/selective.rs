@@ -3,7 +3,7 @@ use img_parts::jpeg::{markers, Jpeg};
 use img_parts::png::Png;
 use img_parts::webp::{WebP, CHUNK_EXIF, CHUNK_XMP};
 use img_parts::Bytes;
-use muda_core::{strip_image, strip_image_selective, ImageKind, TagFamily};
+use muda_core::{strip_image, strip_image_selective, FileKind, TagFamily};
 
 fn fixture(name: &str) -> Vec<u8> {
     let path = format!("{}/tests/fixtures/{name}", env!("CARGO_MANIFEST_DIR"));
@@ -360,7 +360,7 @@ fn empty_keep_plain_jpeg_still_valid() {
     let input = fixture("jpeg_plain.jpg");
     let original = assert_decodes(&input);
     let (output, report) = strip_image_selective("plain.jpg", &input, &[]).expect("plain");
-    assert_eq!(report.kind, ImageKind::Jpeg);
+    assert_eq!(report.kind, FileKind::Jpeg);
     let cleaned = assert_decodes(&output);
     assert_eq!(original.dimensions(), cleaned.dimensions());
 }

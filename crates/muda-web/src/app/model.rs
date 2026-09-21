@@ -1,7 +1,7 @@
 use std::sync::Arc;
 
 use leptos::prelude::*;
-use muda_core::{ImageKind, StripReport, TagFamily};
+use muda_core::{FileKind, StripReport, TagFamily};
 
 pub(crate) const STRIP_CONCURRENCY: usize = 2;
 
@@ -46,7 +46,7 @@ pub(crate) struct FileItem {
     pub id: u64,
     pub name: String,
     pub size: usize,
-    pub kind: Option<ImageKind>,
+    pub kind: Option<FileKind>,
     pub preview_url: String,
     pub original: Arc<[u8]>,
     pub status: RwSignal<Status>,

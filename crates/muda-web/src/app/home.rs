@@ -13,7 +13,7 @@ use super::model::{FileItem, KeepSelection, Status};
 use super::queue::FileQueue;
 use super::size::queue_warning;
 use super::strip::run_strip_queue;
-use super::toolbar::Toolbar;
+use super::toolbar::{toolbar_disabled, Toolbar};
 
 #[component]
 pub(crate) fn HomePage() -> impl IntoView {
@@ -49,7 +49,7 @@ pub(crate) fn HomePage() -> impl IntoView {
                     (
                         Status::Unsupported,
                         Some(
-                            "Not a JPEG, PNG, or WebP. This format is not supported in v1."
+                            "Not a JPEG, PNG, WebP, or PDF. This format is not supported in v1."
                                 .to_string(),
                         ),
                     )
@@ -139,6 +139,8 @@ pub(crate) fn HomePage() -> impl IntoView {
         });
     };
 
+    let queue_empty = Signal::derive(move || toolbar_disabled(items.get().len()));
+
     view! {
         <div class=move || {
             if items.get().is_empty() { "page" } else { "page has-queue" }
@@ -163,8 +165,13 @@ pub(crate) fn HomePage() -> impl IntoView {
                     ).unwrap_or_default()}
                 </p>
             </Show>
-            <Toolbar strip_all=strip_all download_all=download_all clear=clear />
-            <KeepTags keep=keep />
+            <Toolbar
+                strip_all=strip_all
+                download_all=download_all
+                clear=clear
+                disabled=queue_empty
+            />
+            <KeepTags keep=keep disabled=queue_empty />
             <FileQueue items=items keep=keep />
             <PrivacyFooter/>
         </div>

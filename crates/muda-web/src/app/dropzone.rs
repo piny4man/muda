@@ -12,7 +12,7 @@ pub(crate) fn DropZone(
             class=move || {
                 if dragging.get() { "dropzone dragging" } else { "dropzone" }
             }
-            aria-label="File dropzone. JPEG, PNG, and WebP."
+            aria-label="File dropzone. JPEG, PNG, WebP, and PDF."
         >
             <input
                 node_ref=input_ref
@@ -20,7 +20,7 @@ pub(crate) fn DropZone(
                 class="dropzone-input"
                 type="file"
                 multiple
-                accept="image/jpeg,image/png,image/webp,.jpg,.jpeg,.png,.webp"
+                accept="image/jpeg,image/png,image/webp,application/pdf,.jpg,.jpeg,.png,.webp,.pdf"
                 on:change=on_change
                 on:dragover=move |ev| {
                     ev.prevent_default();
@@ -33,8 +33,8 @@ pub(crate) fn DropZone(
                 on:drop=on_drop
             />
             <label class="dropzone-label" for="file-input">
-                <strong>"Drop JPEG, PNG, or WebP files here, or click to browse"</strong>
-                <span class="muted">"Multiple files · JPEG, PNG, and WebP"</span>
+                <strong>"Drop JPEG, PNG, WebP, or PDF files here, or click to browse"</strong>
+                <span class="muted">"Multiple files · JPEG, PNG, WebP, and PDF"</span>
             </label>
         </section>
     }
