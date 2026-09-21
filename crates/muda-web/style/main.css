@@ -239,6 +239,7 @@ button.link {
 button:disabled {
   opacity: 0.4;
   cursor: not-allowed;
+  pointer-events: none;
 }
 
 button:focus-visible,
@@ -290,6 +291,12 @@ button:active:not(:disabled) {
   gap: 0.35rem;
   min-height: 44px;
   margin-right: 0.9rem;
+}
+
+.selective input:disabled, .selective label:has(input:disabled) {
+  opacity: 0.4;
+  cursor: not-allowed;
+  position: relative;
 }
 
 .files {

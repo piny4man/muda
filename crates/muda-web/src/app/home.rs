@@ -139,6 +139,8 @@ pub(crate) fn HomePage() -> impl IntoView {
         });
     };
 
+    let queue_empty = Signal::derive(move || toolbar_disabled(items.get().len()));
+
     view! {
         <div class=move || {
             if items.get().is_empty() { "page" } else { "page has-queue" }
@@ -167,9 +169,9 @@ pub(crate) fn HomePage() -> impl IntoView {
                 strip_all=strip_all
                 download_all=download_all
                 clear=clear
-                disabled=Signal::derive(move || toolbar_disabled(items.get().len()))
+                disabled=queue_empty
             />
-            <KeepTags keep=keep />
+            <KeepTags keep=keep disabled=queue_empty />
             <FileQueue items=items keep=keep />
             <PrivacyFooter/>
         </div>

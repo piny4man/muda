@@ -3,7 +3,7 @@ use leptos::prelude::*;
 use super::model::KeepSelection;
 
 #[component]
-pub(crate) fn KeepTags(keep: RwSignal<KeepSelection>) -> impl IntoView {
+pub(crate) fn KeepTags(keep: RwSignal<KeepSelection>, disabled: Signal<bool>) -> impl IntoView {
     view! {
         <fieldset class="selective">
             <legend>"Keep selected tags"</legend>
@@ -12,6 +12,7 @@ pub(crate) fn KeepTags(keep: RwSignal<KeepSelection>) -> impl IntoView {
                     type="checkbox"
                     prop:checked=move || keep.get().gps
                     on:change=move |ev| keep.update(|k| k.gps = event_target_checked(&ev))
+                    disabled=move || disabled.get()
                 />
                 " GPS"
             </label>
@@ -20,6 +21,7 @@ pub(crate) fn KeepTags(keep: RwSignal<KeepSelection>) -> impl IntoView {
                     type="checkbox"
                     prop:checked=move || keep.get().camera
                     on:change=move |ev| keep.update(|k| k.camera = event_target_checked(&ev))
+                    disabled=move || disabled.get()
                 />
                 " Camera"
             </label>
@@ -28,6 +30,7 @@ pub(crate) fn KeepTags(keep: RwSignal<KeepSelection>) -> impl IntoView {
                     type="checkbox"
                     prop:checked=move || keep.get().software
                     on:change=move |ev| keep.update(|k| k.software = event_target_checked(&ev))
+                    disabled=move || disabled.get()
                 />
                 " Software"
             </label>
@@ -36,6 +39,7 @@ pub(crate) fn KeepTags(keep: RwSignal<KeepSelection>) -> impl IntoView {
                     type="checkbox"
                     prop:checked=move || keep.get().comment
                     on:change=move |ev| keep.update(|k| k.comment = event_target_checked(&ev))
+                    disabled=move || disabled.get()
                 />
                 " Comments"
             </label>
