@@ -3,7 +3,7 @@ name = "muda-web"
 version.workspace = true
 edition.workspace = true
 license.workspace = true
-description = "Browser-first metadata eraser (Leptos + Axum)"
+description = "Browser-first metadata eraser (Leptos, prerendered static site)"
 
 [lib]
 crate-type = ["cdylib", "rlib"]
@@ -16,16 +16,12 @@ leptos_meta = { version = "0.8" }
 axum = { version = "0.8", optional = true }
 console_error_panic_hook = { version = "0.1", optional = true }
 leptos_axum = { version = "0.8", optional = true }
-tokio = { version = "1", features = ["rt-multi-thread"], optional = true }
+tokio = { version = "1", features = ["macros", "rt"], optional = true }
 wasm-bindgen = "0.2"
 wasm-bindgen-futures = "0.4"
 js-sys = "0.3"
 gloo-timers = { version = "0.3", features = ["futures"] }
-http = { version = "1", optional = true }
-tower = { version = "0.5", optional = true }
-tower-http = { version = "0.6", features = ["trace", "set-header", "util"], optional = true }
-tracing = { version = "0.1", optional = true }
-tracing-subscriber = { version = "0.3", features = ["env-filter"], optional = true }
+tower = { version = "0.5", features = ["util"], optional = true }
 web-sys = { version = "0.3", features = [
     "Blob",
     "BlobPropertyBag",
@@ -42,6 +38,9 @@ web-sys = { version = "0.3", features = [
     "Window",
 ] }
 
+[dev-dependencies]
+tokio = { version = "1", features = ["macros", "rt-multi-thread"] }
+
 [features]
 hydrate = [
     "leptos/hydrate",
@@ -51,11 +50,7 @@ ssr = [
     "dep:axum",
     "dep:tokio",
     "dep:leptos_axum",
-    "dep:http",
     "dep:tower",
-    "dep:tower-http",
-    "dep:tracing",
-    "dep:tracing-subscriber",
     "leptos/ssr",
     "leptos_meta/ssr",
     "leptos_router/ssr",
@@ -63,7 +58,8 @@ ssr = [
 
 [package.metadata.leptos]
 output-name = "muda-web"
-site-root = "../../target/site"
+# Resolved from the workspace root: <repo>/target/site.
+site-root = "target/site"
 site-pkg-dir = "pkg"
 style-file = "style/main.css"
 assets-dir = "public"

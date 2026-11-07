@@ -12,12 +12,9 @@ mod home;
 mod io;
 mod model;
 mod queue;
-mod server;
 mod size;
 mod strip;
 mod toolbar;
-
-pub use server::{health, upload_unsupported};
 
 use chrome::SiteFooter;
 use home::HomePage;

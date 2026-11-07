@@ -14,3 +14,4 @@ end2end/playwright-report
 end2end/test-results
 
 .impeccable/
+.wrangler/
