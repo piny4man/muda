@@ -1,0 +1,74 @@
+name: deploy
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+concurrency:
+  group: deploy-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  CARGO_TERM_COLOR: always
+  CARGO_INCREMENTAL: 0
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      deployments: write
+    env:
+      # Skip the deploy step (not the build) until the secrets exist, and on
+      # fork PRs, which never receive them.
+      HAS_CF_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN != '' }}
+    steps:
+      - uses: actions/checkout@v4
+
+      # rustup reads rust-toolchain.toml; add the WASM target on top.
+      - name: Toolchain
+        run: |
+          rustup show
+          rustup target add wasm32-unknown-unknown
+
+      - uses: Swatinem/rust-cache@v2
+
+      # Prebuilt cargo-leptos. Do not apt-install binaryen: Ubuntu/Debian
+      # wasm-opt breaks __wbindgen_externrefs and the client never hydrates.
+      # cargo-leptos downloads a current wasm-opt itself.
+      - uses: cargo-bins/cargo-binstall@main
+      - name: cargo-leptos
+        run: cargo binstall cargo-leptos --version 0.3.7 -y
+
+      - name: Test
+        run: |
+          cargo test -p muda-core
+          cargo test -p muda-web --features ssr
+
+      - name: Build site
+        working-directory: crates/muda-web
+        run: cargo leptos build --release
+
+      - name: Prerender
+        run: ./target/release/muda-web
+
+      - name: Check site
+        run: |
+          test -f target/site/index.html
+          test -f target/site/404.html
+          test -f target/site/_headers
+          test -f target/site/pkg/muda-web.wasm
+          # Cloudflare Pages rejects files over 25 MiB.
+          big=$(find target/site -type f -size +25M)
+          if [ -n "$big" ]; then echo "over 25 MiB: $big"; exit 1; fi
+          du -ah target/site | sort -h | tail -n 8
+
+      - name: Deploy to Cloudflare Pages
+        if: env.HAS_CF_TOKEN == 'true'
+        uses: cloudflare/wrangler-action@v3
+        with:
+          apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          command: pages deploy target/site --project-name=muda --branch=${{ github.head_ref || github.ref_name }}
