@@ -1,0 +1,17 @@
+# Cloudflare Pages response headers (replaces the old Axum middleware).
+
+/*
+  X-Content-Type-Options: nosniff
+  Referrer-Policy: no-referrer
+
+# HydrationScripts and the font preload use CORS (`crossorigin`). Safari,
+# including iOS, refuses the WASM/JS/font fetch without ACAO, so the page
+# renders but never hydrates and cannot strip files.
+# /pkg/* names are unhashed: always revalidate so a new index.html never runs
+# against a stale WASM client.
+/pkg/*
+  Access-Control-Allow-Origin: *
+  Cache-Control: no-cache
+
+/fonts/*
+  Access-Control-Allow-Origin: *

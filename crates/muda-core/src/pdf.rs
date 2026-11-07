@@ -699,10 +699,7 @@ fn pdf_text(object: &Object) -> String {
     };
     if bytes.starts_with(&[0xFE, 0xFF]) {
         let (pairs, _) = bytes[2..].as_chunks::<2>();
-        let units: Vec<u16> = pairs
-            .iter()
-            .map(|pair| u16::from_be_bytes(*pair))
-            .collect();
+        let units: Vec<u16> = pairs.iter().map(|pair| u16::from_be_bytes(*pair)).collect();
         return String::from_utf16_lossy(&units);
     }
     String::from_utf8_lossy(bytes).into_owned()

@@ -1,6 +1,8 @@
 #![recursion_limit = "512"]
 
 pub mod app;
+#[cfg(feature = "ssr")]
+pub mod prerender;
 pub mod zip_store;
 
 #[cfg(feature = "hydrate")]
